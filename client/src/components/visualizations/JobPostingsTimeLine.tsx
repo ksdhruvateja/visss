@@ -4,6 +4,7 @@ import { TimeLineData } from '@/types';
 import { format, parseISO } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
+import { useFilterContext } from '@/contexts/FilterContext';
 
 interface JobPostingsTimeLineProps {
   data: TimeLineData | undefined;
@@ -18,6 +19,7 @@ export default function JobPostingsTimeLine({ data, isLoading }: JobPostingsTime
   const [visibleExperienceLevels, setVisibleExperienceLevels] = useState<string[]>([]);
   const [brushExtent, setBrushExtent] = useState<[Date, Date] | null>(null);
   const [redrawTrigger, setRedrawTrigger] = useState(0);
+  const { filters, setFilters, activeItem, setActiveItem } = useFilterContext();
 
   // Set visible experience levels when data changes
   useEffect(() => {
@@ -264,6 +266,9 @@ export default function JobPostingsTimeLine({ data, isLoading }: JobPostingsTime
         .attr('stroke-width', 1.5)
         .style('cursor', 'pointer')
         .on('mouseover', function(event, d) {
+          // Set active item in filter context
+          setActiveItem({ type: 'experienceLevel', value: d.level });
+          
           d3.select(this)
             .attr('r', 6)
             .attr('stroke', '#fff')
@@ -275,6 +280,7 @@ export default function JobPostingsTimeLine({ data, isLoading }: JobPostingsTime
               <div class="font-medium">${d.level}</div>
               <div>${format(parseDate(d.time), 'MMMM yyyy')}</div>
               <div>Job Count: ${d.count}</div>
+              <div class="text-xs italic">Click to filter by experience level</div>
             `);
         })
         .on('mousemove', function(event) {
@@ -283,12 +289,38 @@ export default function JobPostingsTimeLine({ data, isLoading }: JobPostingsTime
             .style('top', `${event.pageY - 20}px`);
         })
         .on('mouseout', function() {
+          // Reset active item
+          setActiveItem({ type: null, value: null });
+          
           d3.select(this)
             .attr('r', 4)
             .attr('stroke', '#2d3748')
             .style('filter', 'none');
           
           tooltip.style('opacity', 0);
+        })
+        .on('click', function(event, d) {
+          // Update global filters
+          const newFilters = { ...filters };
+          const experienceLevel = d.level;
+          
+          // Toggle experience level in filters
+          if (newFilters.experienceLevels.includes(experienceLevel)) {
+            // Remove this experience level
+            newFilters.experienceLevels = newFilters.experienceLevels.filter(e => e !== experienceLevel);
+          } else {
+            // Add this experience level
+            newFilters.experienceLevels = [...newFilters.experienceLevels, experienceLevel];
+          }
+          setFilters(newFilters);
+          
+          // Update visible levels for the chart
+          const isCurrentlyVisible = visibleExperienceLevels.includes(experienceLevel);
+          if (isCurrentlyVisible && visibleExperienceLevels.length > 1) {
+            setVisibleExperienceLevels(visibleExperienceLevels.filter(l => l !== experienceLevel));
+          } else if (!isCurrentlyVisible) {
+            setVisibleExperienceLevels([...visibleExperienceLevels, experienceLevel]);
+          }
         });
     });
 
@@ -303,12 +335,30 @@ export default function JobPostingsTimeLine({ data, isLoading }: JobPostingsTime
       .attr('transform', (d, i) => `translate(${width + 10},${i * 20})`)
       .style('cursor', 'pointer')
       .on('click', function(event, d) {
+        // Toggle visibility of experience level
         const isCurrentlyVisible = visibleExperienceLevels.includes(d);
         if (isCurrentlyVisible && visibleExperienceLevels.length > 1) {
           setVisibleExperienceLevels(visibleExperienceLevels.filter(l => l !== d));
         } else if (!isCurrentlyVisible) {
           setVisibleExperienceLevels([...visibleExperienceLevels, d]);
         }
+        
+        // Update global filters
+        const newFilters = { ...filters };
+        const experienceLevel = d;
+        
+        // Toggle experience level in filters
+        if (newFilters.experienceLevels.includes(experienceLevel)) {
+          // Remove this experience level
+          newFilters.experienceLevels = newFilters.experienceLevels.filter(e => e !== experienceLevel);
+        } else {
+          // Add this experience level
+          newFilters.experienceLevels = [...newFilters.experienceLevels, experienceLevel];
+        }
+        setFilters(newFilters);
+        
+        // Highlight active element in filter context
+        setActiveItem({ type: 'experienceLevel', value: experienceLevel });
       });
 
     legend.append('rect')

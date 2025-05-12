@@ -3,6 +3,7 @@ import * as d3 from 'd3';
 import { StackedBarData } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
+import { useFilterContext } from '@/contexts/FilterContext';
 
 interface JobCountStackedBarProps {
   data: StackedBarData | undefined;
@@ -13,6 +14,32 @@ export default function JobCountStackedBar({ data, isLoading }: JobCountStackedB
   const svgRef = useRef<SVGSVGElement | null>(null);
   const tooltipRef = useRef<HTMLDivElement | null>(null);
   const [activeEmploymentType, setActiveEmploymentType] = useState<string | null>(null);
+  const { filters, setFilters, activeItem, setActiveItem } = useFilterContext();
+
+  // Effect to respond to active items from other charts
+  useEffect(() => {
+    if (!svgRef.current || isLoading || !data || !data.industries.length) return;
+    
+    // If there's an active industry from another chart, highlight it
+    if (activeItem.type === 'industry' && activeItem.value) {
+      const industry = activeItem.value;
+      
+      // Find and highlight this industry's bars
+      const svg = d3.select(svgRef.current);
+      
+      svg.selectAll('.layer')
+        .style('opacity', d => {
+          const layerData = d as any;
+          const layerIndustry = layerData.key;
+          return layerIndustry === industry ? 1 : 0.5;
+        });
+    } else {
+      // Reset all highlights
+      const svg = d3.select(svgRef.current);
+      svg.selectAll('.layer')
+        .style('opacity', 1);
+    }
+  }, [activeItem, data, isLoading]);
 
   useEffect(() => {
     if (isLoading || !data || !data.industries.length) return;
@@ -126,6 +153,9 @@ export default function JobCountStackedBar({ data, isLoading }: JobCountStackedB
           const count = d[1] - d[0];
           const industry = d.data;
           
+          // Set active item in filter context
+          setActiveItem({ type: 'industry', value: industry });
+          
           d3.select(this)
             .attr('opacity', 1)
             .attr('stroke', 'black');
@@ -144,6 +174,9 @@ export default function JobCountStackedBar({ data, isLoading }: JobCountStackedB
             .style('top', `${event.pageY - 20}px`);
         })
         .on('mouseout', function() {
+          // Reset active item in filter context
+          setActiveItem({ type: null, value: null });
+          
           d3.select(this)
             .attr('opacity', isActive ? 0.8 : 0.3)
             .attr('stroke', isActive ? 'white' : 'none');
@@ -151,7 +184,21 @@ export default function JobCountStackedBar({ data, isLoading }: JobCountStackedB
           tooltip.style('opacity', 0);
         })
         .on('click', function() {
+          // Update local state
           setActiveEmploymentType(activeEmploymentType === employmentType ? null : employmentType);
+          
+          // Update global filters
+          const newFilters = { ...filters };
+          if (activeEmploymentType === employmentType) {
+            // Removing this employment type filter
+            newFilters.employmentTypes = newFilters.employmentTypes.filter(t => t !== employmentType);
+          } else {
+            // Adding this employment type filter
+            if (!newFilters.employmentTypes.includes(employmentType)) {
+              newFilters.employmentTypes = [...newFilters.employmentTypes, employmentType];
+            }
+          }
+          setFilters(newFilters);
         });
     });
 
@@ -166,7 +213,21 @@ export default function JobCountStackedBar({ data, isLoading }: JobCountStackedB
       .attr('transform', (d, i) => `translate(${width + 10},${i * 20})`)
       .style('cursor', 'pointer')
       .on('click', function(event, d) {
+        // Update local state
         setActiveEmploymentType(activeEmploymentType === d ? null : d);
+        
+        // Update global filters
+        const newFilters = { ...filters };
+        if (activeEmploymentType === d) {
+          // Removing this employment type filter
+          newFilters.employmentTypes = newFilters.employmentTypes.filter(t => t !== d);
+        } else {
+          // Adding this employment type filter
+          if (!newFilters.employmentTypes.includes(d)) {
+            newFilters.employmentTypes = [...newFilters.employmentTypes, d];
+          }
+        }
+        setFilters(newFilters);
       });
 
     legend.append('rect')

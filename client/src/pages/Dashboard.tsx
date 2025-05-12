@@ -1,4 +1,3 @@
-import { useState } from "react";
 import Header from "@/components/layout/Header";
 import FilterControls from "@/components/dashboard/FilterControls";
 import SalaryExperienceBoxPlot from "@/components/visualizations/SalaryExperienceBoxPlot";
@@ -10,14 +9,10 @@ import JobPostingsTimeLine from "@/components/visualizations/JobPostingsTimeLine
 import GeographicMapChart from "@/components/visualizations/GeographicMapChart";
 import { FilterOptions } from "@/types";
 import useEmploymentData from "@/hooks/useEmploymentData";
+import { useFilterContext } from "@/contexts/FilterContext";
 
 export default function Dashboard() {
-  const [filters, setFilters] = useState<FilterOptions>({
-    experienceLevels: [],
-    locations: [],
-    industries: [],
-    employmentTypes: [],
-  });
+  const { filters, setFilters } = useFilterContext();
 
   const {
     visualizationData,

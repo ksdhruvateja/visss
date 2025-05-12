@@ -4,6 +4,7 @@ import { ScatterPlotData } from '@/types';
 import { formatCurrency, formatDate } from "@/lib/utils/data";
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
+import { useFilterContext } from '@/contexts/FilterContext';
 
 interface SalaryPostingDateScatterProps {
   data: ScatterPlotData | undefined;
@@ -14,9 +15,10 @@ export default function SalaryPostingDateScatter({ data, isLoading }: SalaryPost
   const svgRef = useRef<SVGSVGElement | null>(null);
   const tooltipRef = useRef<HTMLDivElement | null>(null);
   const [showTrendLine, setShowTrendLine] = useState(true);
-  const [groupByIndustry, setGroupByIndustry] = useState(false);
+  const [groupByIndustry, setGroupByIndustry] = useState(true); // Set to true by default
   const [selectedIndustry, setSelectedIndustry] = useState<string | null>(null);
   const [redrawTrigger, setRedrawTrigger] = useState(0);
+  const { filters, setFilters, activeItem, setActiveItem } = useFilterContext();
 
   useEffect(() => {
     if (isLoading || !data || !data.points.length) return;
@@ -122,6 +124,9 @@ export default function SalaryPostingDateScatter({ data, isLoading }: SalaryPost
       .attr('stroke', '#fff')
       .attr('stroke-width', 1)
       .on('mouseover', function(event, d) {
+        // Update active item in filter context
+        setActiveItem({ type: 'industry', value: d.industry });
+        
         d3.select(this)
           .attr('r', 6)
           .attr('stroke', '#000')
@@ -143,6 +148,9 @@ export default function SalaryPostingDateScatter({ data, isLoading }: SalaryPost
           .style('top', `${event.pageY - 20}px`);
       })
       .on('mouseout', function() {
+        // Reset active item in filter context
+        setActiveItem({ type: null, value: null });
+        
         d3.select(this)
           .attr('r', 4)
           .attr('stroke', '#fff');
@@ -185,6 +193,20 @@ export default function SalaryPostingDateScatter({ data, isLoading }: SalaryPost
           } else {
             setSelectedIndustry(d);
           }
+          
+          // Update global filters
+          const newFilters = { ...filters };
+          if (selectedIndustry === d) {
+            // Removing this industry filter
+            newFilters.industries = newFilters.industries.filter(i => i !== d);
+          } else {
+            // Adding this industry filter
+            if (!newFilters.industries.includes(d)) {
+              newFilters.industries = [...newFilters.industries, d];
+            }
+          }
+          setFilters(newFilters);
+          
           setRedrawTrigger(prev => prev + 1);
         });
 

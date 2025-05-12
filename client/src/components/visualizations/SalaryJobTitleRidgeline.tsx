@@ -4,6 +4,7 @@ import { RidgelineData } from '@/types';
 import { formatCurrency } from "@/lib/utils/data";
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
+import { useFilterContext } from '@/contexts/FilterContext';
 
 interface SalaryJobTitleRidgelineProps {
   data: RidgelineData | undefined;
@@ -15,6 +16,7 @@ export default function SalaryJobTitleRidgeline({ data, isLoading }: SalaryJobTi
   const tooltipRef = useRef<HTMLDivElement | null>(null);
   const [showTopTitles, setShowTopTitles] = useState(true);
   const [redrawTrigger, setRedrawTrigger] = useState(0);
+  const { activeItem, setActiveItem } = useFilterContext();
   
   // Formatting utilities 
   const formatSalary = (value: number): string => {

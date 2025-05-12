@@ -5,6 +5,7 @@ import { formatCurrency } from "@/lib/utils/data";
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { useFilterContext } from '@/contexts/FilterContext';
 
 interface SalaryLocationIndustryBarChartProps {
   data: GroupedBarData | undefined;
@@ -15,39 +16,57 @@ export default function SalaryLocationIndustryBarChart({ data, isLoading }: Sala
   const svgRef = useRef<SVGSVGElement | null>(null);
   const tooltipRef = useRef<HTMLDivElement | null>(null);
   const [activeIndustries, setActiveIndustries] = useState<string[]>([]);
+  const { filters, setFilters, activeItem, setActiveItem } = useFilterContext();
   
   // Set top 3 industries as active by default once data loads
   useEffect(() => {
     if (!isLoading && data && data.industries && data.industries.length > 0) {
       // If activeIndustries is empty, set default industries
       if (activeIndustries.length === 0) {
-        // Sort industries by average salary across all locations
-        const industryTotals = data.industries.map(industry => {
-          let total = 0;
-          let count = 0;
-          
-          data.locations.forEach(location => {
-            if (data.data[location] && data.data[location][industry] > 0) {
-              total += data.data[location][industry];
-              count++;
-            }
+        // If there are filtered industries, use those
+        if (filters.industries.length > 0) {
+          const filteredIndustries = filters.industries.filter(ind => 
+            data.industries.includes(ind)
+          );
+          setActiveIndustries(filteredIndustries);
+        } else {
+          // Otherwise, sort industries by average salary across all locations
+          const industryTotals = data.industries.map(industry => {
+            let total = 0;
+            let count = 0;
+            
+            data.locations.forEach(location => {
+              if (data.data[location] && data.data[location][industry] > 0) {
+                total += data.data[location][industry];
+                count++;
+              }
+            });
+            
+            return {
+              industry,
+              avgSalary: count > 0 ? total / count : 0
+            };
           });
           
-          return {
-            industry,
-            avgSalary: count > 0 ? total / count : 0
-          };
-        });
-        
-        const topIndustries = industryTotals
-          .sort((a, b) => b.avgSalary - a.avgSalary)
-          .slice(0, 3)
-          .map(item => item.industry);
-          
-        setActiveIndustries(topIndustries);
+          const topIndustries = industryTotals
+            .sort((a, b) => b.avgSalary - a.avgSalary)
+            .slice(0, 3)
+            .map(item => item.industry);
+            
+          setActiveIndustries(topIndustries);
+        }
       }
     }
-  }, [data, isLoading, activeIndustries]);
+  }, [data, isLoading, activeIndustries, filters.industries]);
+  
+  // Highlight industries based on active item in other charts
+  useEffect(() => {
+    if (activeItem.type === 'industry' && activeItem.value && data?.industries.includes(activeItem.value)) {
+      if (!activeIndustries.includes(activeItem.value)) {
+        setActiveIndustries(prev => [...prev, activeItem.value as string]);
+      }
+    }
+  }, [activeItem, data?.industries, activeIndustries]);
 
   // Industry colors with futuristic gradient palette
   const getIndustryColor = (industry: string, isActive: boolean) => {
@@ -163,6 +182,12 @@ export default function SalaryLocationIndustryBarChart({ data, isLoading }: Sala
                 .transition()
                 .duration(200)
                 .attr('opacity', 0.9);
+              
+              // Notify other charts about hover
+              setActiveItem({ 
+                type: 'industry', 
+                value: industry 
+              });
                 
               tooltip
                 .style('opacity', 1)
@@ -184,6 +209,9 @@ export default function SalaryLocationIndustryBarChart({ data, isLoading }: Sala
                 .transition()
                 .duration(200)
                 .attr('opacity', 1);
+              
+              // Reset active item when not hovering
+              setActiveItem({ type: null, value: null });
                 
               tooltip.style('opacity', 0);
             });
@@ -230,6 +258,7 @@ export default function SalaryLocationIndustryBarChart({ data, isLoading }: Sala
   }, [data, isLoading, activeIndustries]);
 
   const toggleIndustry = (industry: string) => {
+    // Update local chart state
     setActiveIndustries(prev => {
       if (prev.includes(industry)) {
         return prev.filter(i => i !== industry);
@@ -237,6 +266,27 @@ export default function SalaryLocationIndustryBarChart({ data, isLoading }: Sala
         return [...prev, industry];
       }
     });
+    
+    // Update global filter context
+    if (filters.industries.includes(industry)) {
+      // Remove industry from global filters
+      setFilters({
+        ...filters,
+        industries: filters.industries.filter(i => i !== industry)
+      });
+      // Clear active item if it's the same industry
+      if (activeItem.type === 'industry' && activeItem.value === industry) {
+        setActiveItem({ type: null, value: null });
+      }
+    } else {
+      // Add industry to global filters
+      setFilters({
+        ...filters,
+        industries: [...filters.industries, industry]
+      });
+      // Set as active item to highlight in other charts
+      setActiveItem({ type: 'industry', value: industry });
+    }
   };
 
   if (isLoading) {

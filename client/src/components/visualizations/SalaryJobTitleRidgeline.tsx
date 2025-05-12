@@ -31,6 +31,31 @@ export default function SalaryJobTitleRidgeline({ data, isLoading }: SalaryJobTi
       maximumFractionDigits: 0
     }).format(value);
   };
+  
+  // Effect to highlight elements based on active items from other charts
+  useEffect(() => {
+    if (!svgRef.current || isLoading || !data || !data.jobTitles || data.jobTitles.length === 0) return;
+    
+    const svg = d3.select(svgRef.current);
+    
+    // Reset all highlights first
+    svg.selectAll('.job-group rect')
+      .attr('opacity', 0.8)
+      .style('filter', 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))');
+    
+    // If there's an active job title from another chart, highlight it
+    if (activeItem.type === 'jobTitle' && activeItem.value) {
+      const jobTitle = activeItem.value;
+      const jobGroup = svg.selectAll('.job-group')
+        .filter(d => d.title === jobTitle);
+      
+      if (!jobGroup.empty()) {
+        jobGroup.select('rect:nth-child(2)')
+          .attr('opacity', 1)
+          .style('filter', 'drop-shadow(0 4px 8px rgba(0,0,0,0.5))');
+      }
+    }
+  }, [activeItem, data, isLoading]);
 
   useEffect(() => {
     // Make sure we have valid data with job titles and salary ranges
@@ -281,6 +306,12 @@ export default function SalaryJobTitleRidgeline({ data, isLoading }: SalaryJobTi
           .attr('opacity', 1)
           .style('filter', 'drop-shadow(0 4px 8px rgba(0,0,0,0.5))');
         
+        // Update filter context to notify other charts
+        setActiveItem({
+          type: 'jobTitle',
+          value: d.title
+        });
+        
         // Show tooltip with statistics
         tooltip
           .style('opacity', 1)
@@ -323,6 +354,9 @@ export default function SalaryJobTitleRidgeline({ data, isLoading }: SalaryJobTi
             .select('rect:nth-child(2)')
             .attr('opacity', 0.8)
             .style('filter', 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))');
+          
+          // Reset active item in filter context
+          setActiveItem({ type: null, value: null });
           
           tooltip.style('opacity', 0);
         } catch (error) {

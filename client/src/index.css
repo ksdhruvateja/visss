@@ -2,6 +2,15 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Custom styles for visualizations */
+.data-point {
+  transition: all 0.2s ease;
+}
+
+.data-point.selected {
+  filter: drop-shadow(0px 0px 6px rgba(255,255,255,0.5));
+}
+
 :root {
       --background: 0 0% 100%;
 --foreground: 20 14.3% 4.1%;

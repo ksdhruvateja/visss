@@ -27,6 +27,32 @@ export default function JobPostingsTimeLine({ data, isLoading }: JobPostingsTime
       setVisibleExperienceLevels(data.experienceLevels);
     }
   }, [data, isLoading]);
+  
+  // Create a custom effect to ensure data points are interactive when zoomed in
+  useEffect(() => {
+    if (!brushExtent || !svgRef.current || isLoading || !data) return;
+    
+    // Add specific interactivity to data points after zoom
+    const svg = d3.select(svgRef.current);
+    const dataPoints = svg.selectAll('.data-point');
+    
+    // Make sure the points respond properly to clicks
+    dataPoints.each(function() {
+      const point = d3.select(this);
+      const level = point.attr('data-level');
+      
+      // Update point appearance based on filter state
+      if (filters.experienceLevels.includes(level)) {
+        point.classed('selected', true)
+          .attr('stroke', '#fff')
+          .attr('stroke-width', 2);
+      } else {
+        point.classed('selected', false)
+          .attr('stroke', '#2d3748')
+          .attr('stroke-width', 1.5);
+      }
+    });
+  }, [brushExtent, filters, isLoading, data]);
 
   // Effect for aggregating data by the selected time interval
   const getAggregatedData = () => {
@@ -151,6 +177,7 @@ export default function JobPostingsTimeLine({ data, isLoading }: JobPostingsTime
     // Create the SVG container
     const g = svg
       .append('g')
+      .attr('class', 'chart-group')
       .attr('transform', `translate(${margin.left},${margin.top})`);
 
     // Parse dates
@@ -258,6 +285,7 @@ export default function JobPostingsTimeLine({ data, isLoading }: JobPostingsTime
         .data(lineData)
         .enter()
         .append('circle')
+        .attr('class', 'data-point')
         .attr('cx', d => x(parseDate(d.time)))
         .attr('cy', d => y(d.count))
         .attr('r', 4)
@@ -265,6 +293,8 @@ export default function JobPostingsTimeLine({ data, isLoading }: JobPostingsTime
         .attr('stroke', '#2d3748')
         .attr('stroke-width', 1.5)
         .style('cursor', 'pointer')
+        .attr('data-level', d => d.level) // Add data attribute for easier selection
+        .attr('data-time', d => d.time)   // Add data attribute for filtering
         .on('mouseover', function(event, d) {
           // Set active item in filter context
           setActiveItem({ type: 'experienceLevel', value: d.level });
@@ -289,8 +319,10 @@ export default function JobPostingsTimeLine({ data, isLoading }: JobPostingsTime
             .style('top', `${event.pageY - 20}px`);
         })
         .on('mouseout', function() {
-          // Reset active item
-          setActiveItem({ type: null, value: null });
+          // Only reset active item if we're not being clicked
+          if (!d3.select(this).classed('selected')) {
+            setActiveItem({ type: null, value: null });
+          }
           
           d3.select(this)
             .attr('r', 4)
@@ -300,6 +332,15 @@ export default function JobPostingsTimeLine({ data, isLoading }: JobPostingsTime
           tooltip.style('opacity', 0);
         })
         .on('click', function(event, d) {
+          // Toggle selected class
+          const isSelected = d3.select(this).classed('selected');
+          d3.select(this).classed('selected', !isSelected);
+          
+          // Mark this level as selected
+          d3.select(this)
+            .attr('stroke', !isSelected ? '#fff' : '#2d3748')
+            .attr('stroke-width', !isSelected ? 2 : 1.5);
+            
           // Update global filters
           const newFilters = { ...filters };
           const experienceLevel = d.level;
@@ -321,6 +362,23 @@ export default function JobPostingsTimeLine({ data, isLoading }: JobPostingsTime
           } else if (!isCurrentlyVisible) {
             setVisibleExperienceLevels([...visibleExperienceLevels, experienceLevel]);
           }
+          
+          // Show updated tooltip with selection state
+          tooltip
+            .style('opacity', 1)
+            .html(`
+              <div class="font-medium">${d.level}</div>
+              <div>${format(parseDate(d.time), 'MMMM yyyy')}</div>
+              <div>Job Count: ${d.count}</div>
+              <div class="text-xs italic text-${!isSelected ? 'green' : 'red'}-400">
+                ${!isSelected ? '✓ Added to filters' : '✕ Removed from filters'}
+              </div>
+            `);
+            
+          // Keep tooltip visible for a moment
+          setTimeout(() => {
+            tooltip.style('opacity', 0);
+          }, 1500);
         });
     });
 

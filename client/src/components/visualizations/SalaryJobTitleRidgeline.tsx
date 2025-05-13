@@ -1,10 +1,12 @@
-import { useRef, useEffect, useState } from 'react';
+import { useRef, useEffect, useState, useCallback } from 'react';
 import * as d3 from 'd3';
 import { RidgelineData } from '@/types';
 import { formatCurrency } from "@/lib/utils/data";
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { useFilterContext } from '@/contexts/FilterContext';
+import { Badge } from '@/components/ui/badge';
+import { LucideArrowLeftRight, LucideZoomIn, LucidePlus, LucideMinus, LucideMaximize, LucideArrowUpDown } from 'lucide-react';
 
 interface SalaryJobTitleRidgelineProps {
   data: RidgelineData | undefined;
@@ -20,6 +22,23 @@ export default function SalaryJobTitleRidgeline({ data, isLoading }: SalaryJobTi
   const [sortBy, setSortBy] = useState<'alphabetical' | 'median' | 'range'>('median');
   const { filters, setFilters, activeItem, setActiveItem } = useFilterContext();
   
+  // New state variables for enhanced functionality
+  const [zoomMode, setZoomMode] = useState(false);
+  const [zoomedJob, setZoomedJob] = useState<string | null>(null);
+  const [comparingJobs, setComparingJobs] = useState<string[]>([]);
+  const [percentileView, setPercentileView] = useState(false);
+  const [salarySummary, setSalarySummary] = useState<{
+    min: number;
+    max: number;
+    median: number;
+    mean: number;
+    p25: number;
+    p75: number;
+    p90: number;
+    count: number;
+    job: string;
+  } | null>(null);
+  
   // Formatting utilities 
   const formatSalary = (value: number): string => {
     return Math.round(value).toLocaleString('en-US');
@@ -33,6 +52,55 @@ export default function SalaryJobTitleRidgeline({ data, isLoading }: SalaryJobTi
       maximumFractionDigits: 0
     }).format(value);
   };
+  
+  // Helper function to calculate and update salary statistics for a job
+  const calculateSalaryStats = useCallback((jobTitle: string) => {
+    if (!data || !data.salaryRanges || !data.salaryRanges[jobTitle]) {
+      setSalarySummary(null);
+      return;
+    }
+    
+    const values = data.salaryRanges[jobTitle].values;
+    if (!values || values.length === 0) {
+      setSalarySummary(null);
+      return;
+    }
+    
+    // Sort values for percentile calculations
+    const sortedValues = [...values].sort((a, b) => a - b);
+    
+    // Calculate statistics
+    const min = sortedValues[0];
+    const max = sortedValues[sortedValues.length - 1];
+    const median = d3.median(sortedValues) || min;
+    const mean = d3.mean(sortedValues) || min;
+    
+    // Calculate percentiles
+    const p25 = sortedValues.length > 1 
+      ? d3.quantile(sortedValues, 0.25) || min
+      : min;
+    
+    const p75 = sortedValues.length > 1 
+      ? d3.quantile(sortedValues, 0.75) || max
+      : max;
+      
+    const p90 = sortedValues.length > 1 
+      ? d3.quantile(sortedValues, 0.9) || max
+      : max;
+    
+    // Update state with calculated statistics
+    setSalarySummary({
+      min,
+      max,
+      median,
+      mean,
+      p25,
+      p75,
+      p90,
+      count: values.length,
+      job: jobTitle
+    });
+  }, [data]);
   
   // Effect to highlight elements based on active items from other charts
   useEffect(() => {
@@ -514,9 +582,40 @@ export default function SalaryJobTitleRidgeline({ data, isLoading }: SalaryJobTi
         }
       })
       .on('click', function(event, d) {
-        // Update global filters
-        const newFilters = { ...filters };
         const jobTitle = d.title;
+        
+        // Calculate statistics for this job
+        calculateSalaryStats(jobTitle);
+        
+        // If in comparison mode, handle adding/removing from comparison
+        if (comparingJobs.length > 0) {
+          // Toggle this job in/out of comparison
+          if (comparingJobs.includes(jobTitle)) {
+            setComparingJobs(comparingJobs.filter(job => job !== jobTitle));
+          } else if (comparingJobs.length < 3) { // Limit to comparing 3 jobs max
+            setComparingJobs([...comparingJobs, jobTitle]);
+          }
+          setRedrawTrigger(prev => prev + 1);
+          return;
+        }
+        
+        // If in zoom mode and this is the zoomed job, exit zoom mode
+        if (zoomMode && zoomedJob === jobTitle) {
+          setZoomMode(false);
+          setZoomedJob(null);
+          setRedrawTrigger(prev => prev + 1);
+          return;
+        }
+        
+        // If in zoom mode but this isn't the zoomed job, change zoomed job
+        if (zoomMode && zoomedJob !== jobTitle) {
+          setZoomedJob(jobTitle);
+          setRedrawTrigger(prev => prev + 1);
+          return;
+        }
+        
+        // Regular filtering behavior (when not in special modes)
+        const newFilters = { ...filters };
         
         if (filters.industries.includes(jobTitle)) {
           // If this job title is already selected, remove it

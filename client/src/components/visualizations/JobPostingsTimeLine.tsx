@@ -27,20 +27,20 @@ export default function JobPostingsTimeLine({ data, isLoading }: JobPostingsTime
       setVisibleExperienceLevels(data.experienceLevels);
     }
   }, [data, isLoading]);
-
+  
   // Create a custom effect to ensure data points are interactive when zoomed in
   useEffect(() => {
     if (!brushExtent || !svgRef.current || isLoading || !data) return;
-
+    
     // Add specific interactivity to data points after zoom
     const svg = d3.select(svgRef.current);
     const dataPoints = svg.selectAll('.data-point');
-
+    
     // Make sure the points respond properly to clicks
     dataPoints.each(function() {
       const point = d3.select(this);
       const level = point.attr('data-level');
-
+      
       // Update point appearance based on filter state
       if (filters.experienceLevels.includes(level)) {
         point.classed('selected', true)
@@ -57,31 +57,31 @@ export default function JobPostingsTimeLine({ data, isLoading }: JobPostingsTime
   // Effect for aggregating data by the selected time interval
   const getAggregatedData = () => {
     if (!data || !data.timePoints || !data.experienceLevels) return null;
-
+    
     // Parse dates
     const timePoints = data.timePoints.map(date => date);
     let aggregatedData: Record<string, Record<string, number>> = {};
-
+    
     // Aggregate data based on selected time interval
     if (timeInterval === 'Weekly') {
       // Weekly aggregation - group into weeks
       aggregatedData = {};
       data.experienceLevels.forEach(expLevel => {
         aggregatedData[expLevel] = {};
-
+        
         // Group timepoints into weeks
         let weekGroups: Record<string, { sum: number, count: number }> = {};
-
+        
         data.timePoints.forEach(date => {
           const weekOfYear = getWeekOfYear(date);
           if (!weekGroups[weekOfYear]) {
             weekGroups[weekOfYear] = { sum: 0, count: 0 };
           }
-
+          
           weekGroups[weekOfYear].sum += data.data[expLevel][date] || 0;
           weekGroups[weekOfYear].count += 1;
         });
-
+        
         // Calculate averages and format without "Week" prefix
         Object.entries(weekGroups).forEach(([week, stats]) => {
           // Get date of the first day of the week
@@ -89,12 +89,12 @@ export default function JobPostingsTimeLine({ data, isLoading }: JobPostingsTime
           aggregatedData[expLevel][`${format(weekDate, 'MMM dd')}`] = Math.round(stats.sum / stats.count);
         });
       });
-
+      
       // Create new time points for weeks
       const newTimePoints = Object.keys(
         Object.values(aggregatedData)[0] || {}
       ).sort();
-
+      
       return {
         timePoints: newTimePoints,
         experienceLevels: data.experienceLevels,
@@ -106,31 +106,31 @@ export default function JobPostingsTimeLine({ data, isLoading }: JobPostingsTime
       aggregatedData = {};
       data.experienceLevels.forEach(expLevel => {
         aggregatedData[expLevel] = {};
-
+        
         // Group timepoints into quarters
         let quarterGroups: Record<string, { sum: number, count: number }> = {};
-
+        
         data.timePoints.forEach(date => {
           const quarter = getQuarter(date);
           if (!quarterGroups[quarter]) {
             quarterGroups[quarter] = { sum: 0, count: 0 };
           }
-
+          
           quarterGroups[quarter].sum += data.data[expLevel][date] || 0;
           quarterGroups[quarter].count += 1;
         });
-
+        
         // Calculate averages
         Object.entries(quarterGroups).forEach(([quarter, stats]) => {
           aggregatedData[expLevel][quarter] = Math.round(stats.sum / stats.count);
         });
       });
-
+      
       // Create new time points for quarters
       const newTimePoints = Object.keys(
         Object.values(aggregatedData)[0] || {}
       ).sort();
-
+      
       return {
         timePoints: newTimePoints,
         experienceLevels: data.experienceLevels,
@@ -146,7 +146,7 @@ export default function JobPostingsTimeLine({ data, isLoading }: JobPostingsTime
       };
     }
   };
-
+  
   // Helper function to get week of year from date string
   const getWeekOfYear = (dateStr: string) => {
     const date = parseISO(dateStr);
@@ -154,24 +154,24 @@ export default function JobPostingsTimeLine({ data, isLoading }: JobPostingsTime
     const days = Math.floor((date.getTime() - startOfYear.getTime()) / (24 * 60 * 60 * 1000));
     return Math.ceil((days + startOfYear.getDay() + 1) / 7).toString();
   };
-
+  
   // Helper function to get the date of a specific week number
   const getDateOfWeek = (weekNum: number) => {
     // Create a date object for January 1st of the current year
     const year = new Date().getFullYear();
     const januaryFirst = new Date(year, 0, 1);
-
+    
     // Calculate days to add to get to the first day of the requested week
     // Week 1 starts on the first day of the year
     const daysToAdd = (weekNum - 1) * 7;
-
+    
     // Create date for the first day of the requested week
     const result = new Date(januaryFirst);
     result.setDate(januaryFirst.getDate() + daysToAdd);
-
+    
     return result;
   };
-
+  
   // Helper function to get quarter from date string
   const getQuarter = (dateStr: string) => {
     const date = parseISO(dateStr);
@@ -222,13 +222,13 @@ export default function JobPostingsTimeLine({ data, isLoading }: JobPostingsTime
         }
       }
     };
-
+    
     // Create X scale
     const timePoints = aggregatedData.timePoints.map(parseDate);
     const x = d3.scaleTime()
       .domain(d3.extent(timePoints) as [Date, Date])
       .range([0, width]);
-
+    
     // Apply brush extent if set
     if (brushExtent) {
       x.domain(brushExtent);
@@ -257,7 +257,7 @@ export default function JobPostingsTimeLine({ data, isLoading }: JobPostingsTime
       .style('text-anchor', 'end')
       .style('font-size', '12px')
       .style('fill', '#e2e8f0'); // Light color for better visibility
-
+      
     // Style the axis lines
     g.selectAll('.domain, .tick line')
       .style('stroke', '#4b5563');
@@ -293,24 +293,24 @@ export default function JobPostingsTimeLine({ data, isLoading }: JobPostingsTime
     // Draw lines for each experience level
     aggregatedData.experienceLevels.forEach(level => {
       if (!visibleExperienceLevels.includes(level)) return;
-
+      
       // Create the data points for this line
       const lineData = aggregatedData.timePoints.map(time => ({
         time,
         count: aggregatedData.data[level][time] || 0,
         level // Store the level with each data point
       }));
-
+      
       // Create a custom line generator for this specific level
       const linePath = d3.line<{time: string, count: number, level: string}>()
         .x(d => x(parseDate(d.time)))
         .y(d => y(d.count))
         .curve(d3.curveMonotoneX);
-
+      
       // Draw the line with enhanced interactivity
       const isLevelSelected = filters.experienceLevels.includes(level);
       const isAnyFilterActive = filters.experienceLevels.length > 0;
-
+      
       // Calculate proper class based on selection state
       let lineClass = 'timeline-line';
       if (isLevelSelected) {
@@ -318,7 +318,7 @@ export default function JobPostingsTimeLine({ data, isLoading }: JobPostingsTime
       } else if (isAnyFilterActive) {
         lineClass += ' faded';
       }
-
+      
       g.append('path')
         .datum(lineData)
         .attr('class', lineClass)
@@ -336,23 +336,23 @@ export default function JobPostingsTimeLine({ data, isLoading }: JobPostingsTime
           d3.select(this)
             .attr('stroke-width', 4)
             .style('filter', 'drop-shadow(0px 0px 8px rgba(255,255,255,0.5))');
-
+            
           // Set active item in filter context
           setActiveItem({ type: 'experienceLevel', value: level });
-
+          
           // Show tooltip with experience level info
           const avgJobCount = lineData.reduce((sum, d) => sum + d.count, 0) / lineData.length;
           const maxJobCount = Math.max(...lineData.map(d => d.count));
           const minJobCount = Math.min(...lineData.map(d => d.count));
           const totalJobs = lineData.reduce((sum, d) => sum + d.count, 0);
-
+          
           // Get growth trend
           const firstValue = lineData[0].count;
           const lastValue = lineData[lineData.length - 1].count;
           const growth = lastValue > firstValue 
             ? `+${Math.round((lastValue - firstValue) / firstValue * 100)}%` 
             : `${Math.round((lastValue - firstValue) / firstValue * 100)}%`;
-
+          
           tooltip
             .style('opacity', 1)
             .style('left', `${event.pageX + 10}px`)
@@ -385,10 +385,10 @@ export default function JobPostingsTimeLine({ data, isLoading }: JobPostingsTime
               .attr('stroke-width', 2.5)
               .style('filter', 'drop-shadow(0px 2px 4px rgba(0,0,0,0.3))');
           }
-
+          
           // Reset active item
           setActiveItem({ type: null, value: null });
-
+          
           // Hide tooltip
           tooltip.style('opacity', 0);
         })
@@ -396,7 +396,7 @@ export default function JobPostingsTimeLine({ data, isLoading }: JobPostingsTime
           // Toggle this experience level in filters
           const newFilters = { ...filters };
           const isLevelSelected = newFilters.experienceLevels.includes(level);
-
+          
           if (isLevelSelected) {
             // Remove this level from filters
             newFilters.experienceLevels = newFilters.experienceLevels.filter(l => l !== level);
@@ -404,10 +404,10 @@ export default function JobPostingsTimeLine({ data, isLoading }: JobPostingsTime
             // Add this level to filters
             newFilters.experienceLevels = [...newFilters.experienceLevels, level];
           }
-
+          
           // Update filters
           setFilters(newFilters);
-
+          
           // Update visible levels for the chart
           const isCurrentlyVisible = visibleExperienceLevels.includes(level);
           if (isCurrentlyVisible && visibleExperienceLevels.length > 1) {
@@ -416,7 +416,7 @@ export default function JobPostingsTimeLine({ data, isLoading }: JobPostingsTime
             setVisibleExperienceLevels([...visibleExperienceLevels, level]);
           }
         });
-
+      
       // Add dots for each data point
       g.selectAll(`dot-${level.replace(/\s+/g, '-')}`)
         .data(lineData)
@@ -435,12 +435,12 @@ export default function JobPostingsTimeLine({ data, isLoading }: JobPostingsTime
         .on('mouseover', function(event, d) {
           // Set active item in filter context
           setActiveItem({ type: 'experienceLevel', value: d.level });
-
+          
           d3.select(this)
             .attr('r', 6)
             .attr('stroke', '#fff')
             .style('filter', 'drop-shadow(0px 0px 6px rgba(255,255,255,0.5))');
-
+          
           tooltip
             .style('opacity', 1)
             .html(`
@@ -460,28 +460,28 @@ export default function JobPostingsTimeLine({ data, isLoading }: JobPostingsTime
           if (!d3.select(this).classed('selected')) {
             setActiveItem({ type: null, value: null });
           }
-
+          
           d3.select(this)
             .attr('r', 4)
             .attr('stroke', '#2d3748')
             .style('filter', 'none');
-
+          
           tooltip.style('opacity', 0);
         })
         .on('click', function(event, d) {
           // Toggle selected class
           const isSelected = d3.select(this).classed('selected');
           d3.select(this).classed('selected', !isSelected);
-
+          
           // Mark this level as selected
           d3.select(this)
             .attr('stroke', !isSelected ? '#fff' : '#2d3748')
             .attr('stroke-width', !isSelected ? 2 : 1.5);
-
+            
           // Update global filters
           const newFilters = { ...filters };
           const experienceLevel = d.level;
-
+          
           // Toggle experience level in filters
           if (newFilters.experienceLevels.includes(experienceLevel)) {
             // Remove this experience level
@@ -491,7 +491,7 @@ export default function JobPostingsTimeLine({ data, isLoading }: JobPostingsTime
             newFilters.experienceLevels = [...newFilters.experienceLevels, experienceLevel];
           }
           setFilters(newFilters);
-
+          
           // Update visible levels for the chart
           const isCurrentlyVisible = visibleExperienceLevels.includes(experienceLevel);
           if (isCurrentlyVisible && visibleExperienceLevels.length > 1) {
@@ -499,7 +499,7 @@ export default function JobPostingsTimeLine({ data, isLoading }: JobPostingsTime
           } else if (!isCurrentlyVisible) {
             setVisibleExperienceLevels([...visibleExperienceLevels, experienceLevel]);
           }
-
+          
           // Show updated tooltip with selection state
           tooltip
             .style('opacity', 1)
@@ -511,7 +511,7 @@ export default function JobPostingsTimeLine({ data, isLoading }: JobPostingsTime
                 ${!isSelected ? '✓ Added to filters' : '✕ Removed from filters'}
               </div>
             `);
-
+            
           // Keep tooltip visible for a moment
           setTimeout(() => {
             tooltip.style('opacity', 0);
@@ -530,37 +530,28 @@ export default function JobPostingsTimeLine({ data, isLoading }: JobPostingsTime
       .attr('transform', (d, i) => `translate(${width + 10},${i * 20})`)
       .style('cursor', 'pointer')
       .on('click', function(event, d) {
-        const isShiftPressed = event.shiftKey;
+        // Toggle visibility of experience level
         const isCurrentlyVisible = visibleExperienceLevels.includes(d);
-
-        if (!isShiftPressed) {
-          // Single selection mode
-          setVisibleExperienceLevels([d]);
-          setFilters({
-            ...filters,
-            experienceLevels: [d]
-          });
-        } else {
-          // Multiple selection mode (with Shift key)
-          if (isCurrentlyVisible) {
-            // Remove if already visible
-            if (visibleExperienceLevels.length > 1) {
-              setVisibleExperienceLevels(visibleExperienceLevels.filter(l => l !== d));
-              setFilters({
-                ...filters,
-                experienceLevels: filters.experienceLevels.filter(e => e !== d)
-              });
-            }
-          } else {
-            // Add to selection
-            setVisibleExperienceLevels([...visibleExperienceLevels, d]);
-            setFilters({
-              ...filters,
-              experienceLevels: [...filters.experienceLevels, d]
-            });
-          }
+        if (isCurrentlyVisible && visibleExperienceLevels.length > 1) {
+          setVisibleExperienceLevels(visibleExperienceLevels.filter(l => l !== d));
+        } else if (!isCurrentlyVisible) {
+          setVisibleExperienceLevels([...visibleExperienceLevels, d]);
         }
-
+        
+        // Update global filters
+        const newFilters = { ...filters };
+        const experienceLevel = d;
+        
+        // Toggle experience level in filters
+        if (newFilters.experienceLevels.includes(experienceLevel)) {
+          // Remove this experience level
+          newFilters.experienceLevels = newFilters.experienceLevels.filter(e => e !== experienceLevel);
+        } else {
+          // Add this experience level
+          newFilters.experienceLevels = [...newFilters.experienceLevels, experienceLevel];
+        }
+        setFilters(newFilters);
+        
         // Highlight active element in filter context
         setActiveItem({ type: 'experienceLevel', value: experienceLevel });
       });
@@ -627,14 +618,14 @@ export default function JobPostingsTimeLine({ data, isLoading }: JobPostingsTime
           setBrushExtent(null);
           return;
         }
-
+        
         // Convert brush selection from pixels to dates
         const [x0, x1] = event.selection as [number, number];
         const newDomain = [xBrush.invert(x0), xBrush.invert(x1)] as [Date, Date];
-
+        
         // Update the brush extent
         setBrushExtent(newDomain);
-
+        
         // Store the currently active experience level to restore it after redraw
         const activeExp = activeItem.type === 'experienceLevel' ? activeItem.value : null;
         if (activeExp) {
@@ -649,7 +640,7 @@ export default function JobPostingsTimeLine({ data, isLoading }: JobPostingsTime
     const brushG = brushArea.append('g')
       .attr('class', 'brush')
       .call(brush);
-
+    
     // If there's an existing brush extent, set the brush to that position
     if (brushExtent) {
       brushG.call(brush.move, [xBrush(brushExtent[0]), xBrush(brushExtent[1])]);
@@ -664,25 +655,25 @@ export default function JobPostingsTimeLine({ data, isLoading }: JobPostingsTime
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, [data, isLoading, visibleExperienceLevels, timeInterval, brushExtent, aggregatedData, redrawTrigger]);
-
+  
   // Effect to update line styling based on filtered experience levels
   useEffect(() => {
     if (!svgRef.current || isLoading || !data) return;
-
+    
     // Get all timeline lines
     const lines = d3.select(svgRef.current)
       .selectAll('.timeline-line');
-
+    
     // Update classes based on filter selections
     lines.each(function() {
       const line = d3.select(this);
       const level = line.attr('data-level');
-
+      
       if (!level) return; // Skip if no level attribute
-
+      
       // Check if this level is in the filters
       const isSelected = filters.experienceLevels.includes(level);
-
+      
       // Update class based on selection state
       if (isSelected) {
         line.classed('selected', true)
@@ -781,7 +772,7 @@ export default function JobPostingsTimeLine({ data, isLoading }: JobPostingsTime
       <div className="p-2 flex-grow flex flex-col">
         <div className="relative flex-grow">
           <svg 
-ref={svgRef} 
+            ref={svgRef} 
             width="100%" 
             height="100%" 
             className="bg-gray-800/30 rounded"

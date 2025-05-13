@@ -333,7 +333,25 @@ export default function SalaryLocationIndustryBarChart({ data, isLoading }: Sala
         </h3>
       </div>
       <div className="p-2 flex-grow flex flex-col">
-        <div className="flex items-start justify-end mb-2 flex-wrap gap-1">
+        <div className="flex flex-col gap-1 mb-2">
+          <div className="flex items-center gap-1">
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-5 px-2 py-0 text-xs text-gray-400 hover:text-white"
+              onClick={() => setActiveIndustries(data.industries)}
+            >
+              Select All
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-5 px-2 py-0 text-xs text-gray-400 hover:text-white"
+              onClick={() => setActiveIndustries([])}
+            >
+              Clear All
+            </Button>
+          </div>
           <div className="flex flex-wrap gap-1 max-h-16 overflow-y-auto w-full">
             {data.industries.map(industry => (
               <Badge
@@ -344,7 +362,19 @@ export default function SalaryLocationIndustryBarChart({ data, isLoading }: Sala
                     ? 'bg-gradient-to-r from-blue-500 to-cyan-400 text-white border-transparent'
                     : 'bg-gray-800 text-gray-400 border-gray-600 hover:border-gray-500'
                 }`}
-                onClick={() => toggleIndustry(industry)}
+                onClick={(e) => {
+                  if (e.ctrlKey || e.metaKey) {
+                    // Add/remove single industry
+                    toggleIndustry(industry);
+                  } else {
+                    // Set as single selection
+                    setActiveIndustries([industry]);
+                    setFilters({
+                      ...filters,
+                      industries: [industry]
+                    });
+                  }
+                }}
               >
                 {industry}
                 {activeIndustries.includes(industry) && (

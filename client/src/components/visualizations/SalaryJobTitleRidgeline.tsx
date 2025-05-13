@@ -251,16 +251,7 @@ export default function SalaryJobTitleRidgeline({ data, isLoading }: SalaryJobTi
       .attr('class', 'job-group')
       .attr('transform', d => `translate(0,${y(d.title)!})`);
 
-    // Add the main bar (min to max)
-    jobGroups.append('rect')
-      .attr('x', d => x(d.min))
-      .attr('y', d => y.bandwidth() / 3)
-      .attr('width', d => x(d.max) - x(d.min))
-      .attr('height', y.bandwidth() / 3)
-      .attr('fill', '#334155')
-      .attr('rx', 2);
-
-    // Create a single gradient that all rectangles can use
+    // Create a single gradient that all elements can use
     const defs = svg.append('defs');
     const gradientId = 'salary-gradient';
     
@@ -279,38 +270,150 @@ export default function SalaryJobTitleRidgeline({ data, isLoading }: SalaryJobTi
     gradient.append('stop')
       .attr('offset', '100%')
       .attr('stop-color', '#8b5cf6');
+
+    // Apply different visualizations based on selected style
+    if (visualizationStyle === 'boxplot') {
+      // Add the main bar (min to max)
+      jobGroups.append('rect')
+        .attr('x', d => x(d.min))
+        .attr('y', d => y.bandwidth() / 3)
+        .attr('width', d => x(d.max) - x(d.min))
+        .attr('height', y.bandwidth() / 3)
+        .attr('fill', '#334155')
+        .attr('rx', 2);
+      
+      // Add the IQR box (Q1 to Q3)
+      jobGroups.append('rect')
+        .attr('x', d => x(d.q1))
+        .attr('y', d => y.bandwidth() / 4)
+        .attr('width', d => Math.max(x(d.q3) - x(d.q1), 1)) // Ensure minimum width of 1px
+        .attr('height', y.bandwidth() / 2)
+        .attr('fill', `url(#${gradientId})`) // Use the same gradient for all
+        .attr('rx', 2)
+        .attr('opacity', 0.8)
+        .style('filter', 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))');
+  
+      // Add the median line
+      jobGroups.append('line')
+        .attr('x1', d => x(d.median))
+        .attr('x2', d => x(d.median))
+        .attr('y1', d => 0)
+        .attr('y2', d => y.bandwidth())
+        .attr('stroke', '#f0f9ff')
+        .attr('stroke-width', 2)
+        .attr('stroke-dasharray', '3,2');
+  
+      // Add a glow effect to the median line
+      jobGroups.append('line')
+        .attr('x1', d => x(d.median))
+        .attr('x2', d => x(d.median))
+        .attr('y1', d => y.bandwidth() / 4)
+        .attr('y2', d => y.bandwidth() * 3/4)
+        .attr('stroke', '#f0f9ff')
+        .attr('stroke-width', 4)
+        .attr('opacity', 0.2)
+        .style('filter', 'blur(4px)');
+    }
     
-    // Add the IQR box (Q1 to Q3)
-    jobGroups.append('rect')
-      .attr('x', d => x(d.q1))
-      .attr('y', d => y.bandwidth() / 4)
-      .attr('width', d => Math.max(x(d.q3) - x(d.q1), 1)) // Ensure minimum width of 1px
-      .attr('height', y.bandwidth() / 2)
-      .attr('fill', `url(#${gradientId})`) // Use the same gradient for all
-      .attr('rx', 2)
-      .attr('opacity', 0.8)
-      .style('filter', 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))');
-
-    // Add the median line
-    jobGroups.append('line')
-      .attr('x1', d => x(d.median))
-      .attr('x2', d => x(d.median))
-      .attr('y1', d => 0)
-      .attr('y2', d => y.bandwidth())
-      .attr('stroke', '#f0f9ff')
-      .attr('stroke-width', 2)
-      .attr('stroke-dasharray', '3,2');
-
-    // Add a glow effect to the median line
-    jobGroups.append('line')
-      .attr('x1', d => x(d.median))
-      .attr('x2', d => x(d.median))
-      .attr('y1', d => y.bandwidth() / 4)
-      .attr('y2', d => y.bandwidth() * 3/4)
-      .attr('stroke', '#f0f9ff')
-      .attr('stroke-width', 4)
-      .attr('opacity', 0.2)
-      .style('filter', 'blur(4px)');
+    else if (visualizationStyle === 'density') {
+      // Create a kernel density estimator function
+      const kde = (kernel: any, thresholds: any, data: number[]) => {
+        return thresholds.map((t: number) => [t, d3.mean(data, (d: number) => kernel(t - d)) || 0]);
+      };
+      
+      // Define the kernel function (Epanechnikov)
+      const epanechnikov = (bandwidth: number) => {
+        return (x: number) => {
+          return Math.abs(x /= bandwidth) <= 1 ? 0.75 * (1 - x * x) / bandwidth : 0;
+        };
+      };
+      
+      // For each job title, create a density curve
+      jobGroups.each(function(d: any) {
+        const values = d.values;
+        
+        // Skip if no values or only one value
+        if (!values || values.length <= 1) return;
+        
+        // Create density data
+        const bandwidth = (d.max - d.min) / 5; // Adjust bandwidth based on data range
+        const thresholds = d3.range(d.min, d.max, (d.max - d.min) / 100);
+        const density = kde(epanechnikov(bandwidth), thresholds, values);
+        
+        // Find max density value for scaling
+        const maxDensity = d3.max(density, (d: any) => d[1]) || 0.01;
+        
+        // Create a path for the density curve
+        const area = d3.area()
+          .x((d: any) => x(d[0]))
+          .y0(y.bandwidth())
+          .y1((d: any) => y.bandwidth() - (d[1] / maxDensity) * y.bandwidth() * 0.8);
+        
+        // Add a path element using the density data
+        d3.select(this)
+          .append('path')
+          .datum(density)
+          .attr('fill', `url(#${gradientId})`)
+          .attr('opacity', 0.7)
+          .attr('d', area as any);
+        
+        // Add median line
+        d3.select(this)
+          .append('line')
+          .attr('x1', x(d.median))
+          .attr('x2', x(d.median))
+          .attr('y1', 0)
+          .attr('y2', y.bandwidth())
+          .attr('stroke', '#f0f9ff')
+          .attr('stroke-width', 2)
+          .attr('stroke-dasharray', '3,2');
+      });
+    }
+    
+    else if (visualizationStyle === 'bars') {
+      // Create a bar chart for each salary value
+      jobGroups.each(function(d: any) {
+        const values = d.values;
+        
+        // Skip if no values
+        if (!values || values.length === 0) return;
+        
+        // Sort values for better visualization
+        const sortedValues = [...values].sort((a, b) => a - b);
+        
+        // Create bars for each value
+        d3.select(this)
+          .selectAll('.salary-bar')
+          .data(sortedValues)
+          .enter()
+          .append('rect')
+          .attr('class', 'salary-bar')
+          .attr('x', (val: number) => x(val) - 2) // Center the bar on the value
+          .attr('y', y.bandwidth() * 0.2)
+          .attr('width', 4) // Fixed width for bars
+          .attr('height', y.bandwidth() * 0.6)
+          .attr('fill', (val: number, i: number) => {
+            // Use gradient colors based on position in the array
+            const t = i / (sortedValues.length - 1 || 1);
+            const color1 = d3.rgb('#0ea5e9');
+            const color2 = d3.rgb('#8b5cf6');
+            return d3.interpolateRgb(color1, color2)(t);
+          })
+          .attr('rx', 1)
+          .attr('opacity', 0.7);
+          
+        // Add median line
+        d3.select(this)
+          .append('line')
+          .attr('x1', x(d.median))
+          .attr('x2', x(d.median))
+          .attr('y1', 0)
+          .attr('y2', y.bandwidth())
+          .attr('stroke', '#f0f9ff')
+          .attr('stroke-width', 2)
+          .attr('stroke-dasharray', '3,2');
+      });
+    }
 
     // Add interactive overlay
     jobGroups.append('rect')
@@ -321,11 +424,23 @@ export default function SalaryJobTitleRidgeline({ data, isLoading }: SalaryJobTi
       .attr('fill', 'transparent')
       .style('cursor', 'pointer')
       .on('mouseover', function(event, d) {
-        // Highlight this job title
-        d3.select(this.parentNode)
-          .select('rect:nth-child(2)')
-          .attr('opacity', 1)
-          .style('filter', 'drop-shadow(0 4px 8px rgba(0,0,0,0.5))');
+        // Highlight based on visualization type
+        if (visualizationStyle === 'boxplot') {
+          d3.select(this.parentNode)
+            .select('rect:nth-child(2)')
+            .attr('opacity', 1)
+            .style('filter', 'drop-shadow(0 4px 8px rgba(0,0,0,0.5))');
+        } else if (visualizationStyle === 'density') {
+          d3.select(this.parentNode)
+            .select('path')
+            .attr('opacity', 1)
+            .style('filter', 'drop-shadow(0 4px 8px rgba(0,0,0,0.5))');
+        } else if (visualizationStyle === 'bars') {
+          d3.select(this.parentNode)
+            .selectAll('.salary-bar')
+            .attr('opacity', 1)
+            .style('filter', 'drop-shadow(0 2px 3px rgba(0,0,0,0.4))');
+        }
         
         // Update filter context to notify other charts
         setActiveItem({
@@ -342,6 +457,7 @@ export default function SalaryJobTitleRidgeline({ data, isLoading }: SalaryJobTi
             <div class="text-white">Q1-Q3: ${formatCurrency(d.q1)} - ${formatCurrency(d.q3)}</div>
             <div class="text-white">Range: ${formatCurrency(d.min)} - ${formatCurrency(d.max)}</div>
             <div class="mt-1 text-xs text-slate-200">Based on ${d.count} job postings</div>
+            <div class="text-xs italic mt-1 text-gray-400">Click to filter by job title</div>
           `);
       })
       .on('mousemove', function(event) {
@@ -370,11 +486,23 @@ export default function SalaryJobTitleRidgeline({ data, isLoading }: SalaryJobTi
       })
       .on('mouseout', function() {
         try {
-          // Restore original style
-          d3.select(this.parentNode)
-            .select('rect:nth-child(2)')
-            .attr('opacity', 0.8)
-            .style('filter', 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))');
+          // Restore original style based on visualization type
+          if (visualizationStyle === 'boxplot') {
+            d3.select(this.parentNode)
+              .select('rect:nth-child(2)')
+              .attr('opacity', 0.8)
+              .style('filter', 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))');
+          } else if (visualizationStyle === 'density') {
+            d3.select(this.parentNode)
+              .select('path')
+              .attr('opacity', 0.7)
+              .style('filter', 'none');
+          } else if (visualizationStyle === 'bars') {
+            d3.select(this.parentNode)
+              .selectAll('.salary-bar')
+              .attr('opacity', 0.7)
+              .style('filter', 'none');
+          }
           
           // Reset active item in filter context
           setActiveItem({ type: null, value: null });
@@ -382,6 +510,61 @@ export default function SalaryJobTitleRidgeline({ data, isLoading }: SalaryJobTi
           tooltip.style('opacity', 0);
         } catch (error) {
           console.error("Error resetting tooltip:", error);
+        }
+      })
+      .on('click', function(event, d) {
+        // Update global filters
+        const newFilters = { ...filters };
+        const jobTitle = d.title;
+        
+        if (filters.industries.includes(jobTitle)) {
+          // If this job title is already selected, remove it
+          newFilters.industries = newFilters.industries.filter(t => t !== jobTitle);
+        } else {
+          // Otherwise add it
+          newFilters.industries = [...newFilters.industries, jobTitle];
+        }
+        
+        // Update filters and trigger redraw
+        setFilters(newFilters);
+        
+        // Set this job title as the active item
+        setActiveItem({
+          type: 'jobTitle',
+          value: jobTitle
+        });
+        
+        // Update tooltip to show that this item is selected
+        tooltip
+          .html(`
+            <div class="font-medium text-lg text-white">${d.title}</div>
+            <div class="mt-1 text-cyan-300">Median: ${formatCurrency(d.median)}</div>
+            <div class="text-white">Q1-Q3: ${formatCurrency(d.q1)} - ${formatCurrency(d.q3)}</div>
+            <div class="text-white">Range: ${formatCurrency(d.min)} - ${formatCurrency(d.max)}</div>
+            <div class="mt-1 text-xs text-slate-200">Based on ${d.count} job postings</div>
+            <div class="text-xs italic mt-1 text-green-400">✓ Added to filters</div>
+          `);
+        
+        // Apply a persistent highlight to the selected bar
+        if (visualizationStyle === 'boxplot') {
+          d3.select(this.parentNode)
+            .select('rect:nth-child(2)')
+            .attr('opacity', 1)
+            .style('filter', 'drop-shadow(0 4px 8px rgba(0,0,0,0.5))');
+        } else if (visualizationStyle === 'density') {
+          d3.select(this.parentNode)
+            .select('path')
+            .attr('opacity', 1)
+            .style('stroke', '#ffffff')
+            .style('stroke-width', 1)
+            .style('filter', 'drop-shadow(0 4px 8px rgba(0,0,0,0.5))');
+        } else if (visualizationStyle === 'bars') {
+          d3.select(this.parentNode)
+            .selectAll('.salary-bar')
+            .attr('opacity', 1)
+            .style('stroke', '#ffffff')
+            .style('stroke-width', 0.5)
+            .style('filter', 'drop-shadow(0 2px 4px rgba(0,0,0,0.5))');
         }
       });
 

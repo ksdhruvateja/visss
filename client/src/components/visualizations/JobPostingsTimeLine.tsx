@@ -545,62 +545,63 @@ export default function JobPostingsTimeLine({
           tooltip.style("opacity", 0);
         })
         .on("click", function (event, d) {
-          // Toggle selected class
-          const isSelected = d3.select(this).classed("selected");
-          d3.select(this).classed("selected", !isSelected);
-
-          // Mark this level as selected
-          d3.select(this)
-            .attr("stroke", !isSelected ? "#fff" : "#2d3748")
-            .attr("stroke-width", !isSelected ? 2 : 1.5);
-
-          // Update global filters
-          const newFilters = { ...filters };
+          event.preventDefault();
+          event.stopPropagation();
+          
+          // Get the experience level for this point
           const experienceLevel = d.level;
-
-          // Toggle experience level in filters
-          if (newFilters.experienceLevels.includes(experienceLevel)) {
-            // Remove this experience level
+          
+          // Check if this level is already selected in the filters
+          const isInFilters = filters.experienceLevels.includes(experienceLevel);
+          
+          // Toggle selection state
+          const newFilters = { ...filters };
+          
+          if (isInFilters) {
+            // If already selected, remove from filters
             newFilters.experienceLevels = newFilters.experienceLevels.filter(
-              (e) => e !== experienceLevel,
+              (e) => e !== experienceLevel
             );
           } else {
-            // Add this experience level
+            // If not selected, add to filters
             newFilters.experienceLevels = [
               ...newFilters.experienceLevels,
-              experienceLevel,
+              experienceLevel
             ];
           }
+          
+          // Update the filters
           setFilters(newFilters);
-
-          // Update visible levels for the chart
-          const isCurrentlyVisible =
-            visibleExperienceLevels.includes(experienceLevel);
-          if (isCurrentlyVisible && visibleExperienceLevels.length > 1) {
-            setVisibleExperienceLevels(
-              visibleExperienceLevels.filter((l) => l !== experienceLevel),
-            );
-          } else if (!isCurrentlyVisible) {
-            setVisibleExperienceLevels([
-              ...visibleExperienceLevels,
-              experienceLevel,
-            ]);
-          }
+          
+          // Update the active item to highlight in filter context
+          setActiveItem({ type: "experienceLevel", value: experienceLevel });
+          
+          // Update visual indication of selection
+          const isSelected = !isInFilters; // New state after toggle
+          d3.select(this)
+            .classed("selected", isSelected)
+            .attr("stroke", isSelected ? "#fff" : "#2d3748")
+            .attr("stroke-width", isSelected ? 2 : 1.5);
 
           // Show updated tooltip with selection state
           tooltip.style("opacity", 1).html(`
               <div class="font-medium">${d.level}</div>
               <div>${format(parseDate(d.time), "MMMM yyyy")}</div>
               <div>Job Count: ${d.count}</div>
-              <div class="text-xs italic text-${!isSelected ? "green" : "red"}-400">
-                ${!isSelected ? "✓ Added to filters" : "✕ Removed from filters"}
+              <div class="text-xs italic text-${isSelected ? "green" : "red"}-400">
+                ${isSelected ? "✓ Added to filters" : "✕ Removed from filters"}
               </div>
             `);
 
-          // Keep tooltip visible for a moment
+          // Position the tooltip near the data point
+          tooltip
+            .style("left", `${event.pageX + 10}px`)
+            .style("top", `${event.pageY - 20}px`);
+
+          // Keep tooltip visible for a longer moment
           setTimeout(() => {
             tooltip.style("opacity", 0);
-          }, 1500);
+          }, 2000);
         });
     });
 
@@ -617,37 +618,46 @@ export default function JobPostingsTimeLine({
       .attr("transform", (d, i) => `translate(${width + 10},${i * 20})`)
       .style("cursor", "pointer")
       .on("click", function (event, d) {
-        // Toggle visibility of experience level
-        const isCurrentlyVisible = visibleExperienceLevels.includes(d);
-        if (isCurrentlyVisible && visibleExperienceLevels.length > 1) {
-          setVisibleExperienceLevels(
-            visibleExperienceLevels.filter((l) => l !== d),
-          );
-        } else if (!isCurrentlyVisible) {
-          setVisibleExperienceLevels([...visibleExperienceLevels, d]);
-        }
-
-        // Update global filters
-        const newFilters = { ...filters };
+        event.preventDefault();
+        event.stopPropagation();
+        
+        // Get the experience level for this legend item
         const experienceLevel = d;
-
-        // Toggle experience level in filters
-        if (newFilters.experienceLevels.includes(experienceLevel)) {
-          // Remove this experience level
+        
+        // Check if this level is already selected in the filters
+        const isInFilters = filters.experienceLevels.includes(experienceLevel);
+        
+        // Toggle selection state
+        const newFilters = { ...filters };
+        
+        if (isInFilters) {
+          // If already selected, remove from filters
           newFilters.experienceLevels = newFilters.experienceLevels.filter(
-            (e) => e !== experienceLevel,
+            (e) => e !== experienceLevel
           );
         } else {
-          // Add this experience level
+          // If not selected, add to filters
           newFilters.experienceLevels = [
             ...newFilters.experienceLevels,
-            experienceLevel,
+            experienceLevel
           ];
         }
+        
+        // Update the filters
         setFilters(newFilters);
-
-        // Highlight active element in filter context
+        
+        // Update the active item to highlight in filter context
         setActiveItem({ type: "experienceLevel", value: experienceLevel });
+        
+        // Also update visibility in the chart itself
+        const isCurrentlyVisible = visibleExperienceLevels.includes(experienceLevel);
+        if (isCurrentlyVisible && visibleExperienceLevels.length > 1) {
+          setVisibleExperienceLevels(
+            visibleExperienceLevels.filter((l) => l !== experienceLevel)
+          );
+        } else if (!isCurrentlyVisible) {
+          setVisibleExperienceLevels([...visibleExperienceLevels, experienceLevel]);
+        }
       });
 
     legend

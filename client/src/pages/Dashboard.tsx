@@ -5,7 +5,7 @@ import SalaryLocationIndustryBarChart from "@/components/visualizations/SalaryLo
 import SalaryJobTitleRidgeline from "@/components/visualizations/SalaryJobTitleRidgeline";
 import SalaryPostingDateScatter from "@/components/visualizations/SalaryPostingDateScatter";
 import JobCountStackedBar from "@/components/visualizations/JobCountStackedBar";
-import JobPostingsTimeLine from "@/components/visualizations/JobPostingsTimeLine";
+import HiringPulseChart from "@/components/visualizations/HiringPulseChart";
 import GeographicMapChart from "@/components/visualizations/GeographicMapChart";
 import { FilterOptions } from "@/types";
 import useEmploymentData from "@/hooks/useEmploymentData";
@@ -90,7 +90,7 @@ export default function Dashboard() {
             </div>
             
             <div className="w-full h-1/2">
-              <JobPostingsTimeLine
+              <HiringPulseChart
                 data={visualizationData?.timeLine}
                 isLoading={isLoading}
               />

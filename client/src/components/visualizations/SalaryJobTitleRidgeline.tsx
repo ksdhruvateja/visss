@@ -225,6 +225,7 @@ export default function SalaryJobTitleRidgeline({ data, isLoading }: SalaryJobTi
       .attr('fill', '#f0f9ff')
       .style('font-size', '14px')
       .style('font-weight', 'bold')
+      .style('fill', '#ffffff')
       .text('Salary Distribution by Job Title');
 
     // Create tooltip

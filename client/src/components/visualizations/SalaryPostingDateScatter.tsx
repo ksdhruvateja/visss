@@ -99,6 +99,7 @@ export default function SalaryPostingDateScatter({ data, isLoading }: SalaryPost
       .attr('text-anchor', 'middle')
       .style('font-size', '14px')
       .style('font-weight', 'bold')
+      .style('fill', '#ffffff')
       .text('Correlation Between Salary and Posting Date');
 
     // Create tooltip

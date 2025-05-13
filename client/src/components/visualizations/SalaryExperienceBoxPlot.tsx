@@ -83,6 +83,7 @@ export default function SalaryExperienceBoxPlot({ data, isLoading }: SalaryExper
       .attr('text-anchor', 'middle')
       .style('font-size', '14px')
       .style('font-weight', 'bold')
+      .style('fill', '#ffffff')
       .text('Salary Distribution by Experience Level');
 
     // Create tooltip

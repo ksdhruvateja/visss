@@ -156,6 +156,7 @@ export default function SalaryLocationIndustryBarChart({ data, isLoading }: Sala
       .attr('text-anchor', 'middle')
       .style('font-size', '14px')
       .style('font-weight', 'bold')
+      .style('fill', '#ffffff')
       .text('Average Salary by Location and Industry');
 
     // Create tooltip

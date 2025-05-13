@@ -114,6 +114,7 @@ export default function JobCountStackedBar({ data, isLoading }: JobCountStackedB
       .attr('text-anchor', 'middle')
       .style('font-size', '14px')
       .style('font-weight', 'bold')
+      .style('fill', '#ffffff')
       .text('Job Count by Industry and Employment Type');
 
     // Create tooltip

@@ -32,7 +32,7 @@ export default function GeographicMapChart({ isLoading }: GeographicMapChartProp
   const [dataType, setDataType] = useState<'jobCount' | 'avgSalary' | 'growthRate'>('jobCount');
   const [selectedRegion, setSelectedRegion] = useState<string | null>(null);
   const [showIndustryDetails, setShowIndustryDetails] = useState<boolean>(true);
-  
+
   // Enhanced data with industry and position breakdown
   const [mapData, setMapData] = useState<WorldMapData>({
     regions: {
@@ -158,22 +158,22 @@ export default function GeographicMapChart({ isLoading }: GeographicMapChartProp
 
   useEffect(() => {
     if (isLoading) return;
-    
+
     // Clear any existing visualization
     const svg = d3.select(svgRef.current);
     svg.selectAll('*').remove();
-    
+
     // Define dimensions
     const width = svgRef.current!.clientWidth;
     const height = svgRef.current!.clientHeight;
-    
+
     // Calculate hex grid parameters
     const hexRadius = width / 16;
     const hexHeight = hexRadius * Math.sqrt(3);
     const hexWidth = hexRadius * 2;
     const hexVerticalSpacing = hexHeight;
     const hexHorizontalSpacing = hexWidth * 0.75;
-    
+
     // Coordinates for placing our regions in a hex grid
     const hexPositions = [
       { name: "North America", row: 1, col: 2 },
@@ -183,17 +183,17 @@ export default function GeographicMapChart({ isLoading }: GeographicMapChartProp
       { name: "Asia", row: 1, col: 8 },
       { name: "Australia", row: 3, col: 9 } // Moved Australia up and left to ensure full visibility
     ];
-    
+
     // Create the background
     svg.append('rect')
       .attr('width', width)
       .attr('height', height)
       .attr('fill', 'url(#grid-gradient)')
       .attr('rx', 8);
-    
+
     // Create radial gradients for the background
     const defs = svg.append('defs');
-    
+
     // Background grid gradient
     const gridGradient = defs.append('linearGradient')
       .attr('id', 'grid-gradient')
@@ -201,15 +201,15 @@ export default function GeographicMapChart({ isLoading }: GeographicMapChartProp
       .attr('y1', '0%')
       .attr('x2', '100%')
       .attr('y2', '100%');
-      
+
     gridGradient.append('stop')
       .attr('offset', '0%')
       .attr('stop-color', '#0f172a');
-      
+
     gridGradient.append('stop')
       .attr('offset', '100%')
       .attr('stop-color', '#1e293b');
-    
+
     // Add glowing connections between regions
     const connectionGroup = svg.append('g')
       .attr('class', 'connections');
@@ -223,40 +223,40 @@ export default function GeographicMapChart({ isLoading }: GeographicMapChartProp
       { source: "Asia", target: "Australia" },
       { source: "South America", target: "Africa" }
     ];
-    
+
     // Create gradients for connections
     connections.forEach((connection, i) => {
       const gradientId = `connection-gradient-${i}`;
       const gradient = defs.append('linearGradient')
         .attr('id', gradientId)
         .attr('gradientUnits', 'userSpaceOnUse');
-        
+
       const sourcePosition = hexPositions.find(p => p.name === connection.source);
       const targetPosition = hexPositions.find(p => p.name === connection.target);
-      
+
       if (sourcePosition && targetPosition) {
         const sourceX = sourcePosition.col * hexHorizontalSpacing;
         const sourceY = sourcePosition.row * hexVerticalSpacing + (sourcePosition.col % 2 === 0 ? 0 : hexHeight / 2);
         const targetX = targetPosition.col * hexHorizontalSpacing;
         const targetY = targetPosition.row * hexVerticalSpacing + (targetPosition.col % 2 === 0 ? 0 : hexHeight / 2);
-        
+
         gradient.attr('x1', sourceX)
           .attr('y1', sourceY)
           .attr('x2', targetX)
           .attr('y2', targetY);
-          
+
         gradient.append('stop')
           .attr('offset', '0%')
           .attr('stop-color', dataType === 'avgSalary' ? '#059669' : 
                              dataType === 'growthRate' ? '#d97706' : '#0284c7')
           .attr('stop-opacity', 0.7);
-          
+
         gradient.append('stop')
           .attr('offset', '100%')
           .attr('stop-color', dataType === 'avgSalary' ? '#059669' : 
                              dataType === 'growthRate' ? '#d97706' : '#0284c7')
           .attr('stop-opacity', 0.1);
-          
+
         // Draw the connection line
         connectionGroup.append('line')
           .attr('x1', sourceX)
@@ -269,13 +269,13 @@ export default function GeographicMapChart({ isLoading }: GeographicMapChartProp
           .attr('opacity', 0.6);
       }
     });
-    
+
     // Add a subtle grid pattern
     const gridSize = 30;
     const grid = svg.append('g')
       .attr('class', 'grid')
       .attr('opacity', 0.2);
-      
+
     // Horizontal grid lines
     for (let y = 0; y < height; y += gridSize) {
       grid.append('line')
@@ -286,7 +286,7 @@ export default function GeographicMapChart({ isLoading }: GeographicMapChartProp
         .attr('stroke', 'rgba(100, 116, 139, 0.5)')
         .attr('stroke-width', 0.5);
     }
-    
+
     // Vertical grid lines
     for (let x = 0; x < width; x += gridSize) {
       grid.append('line')
@@ -297,26 +297,26 @@ export default function GeographicMapChart({ isLoading }: GeographicMapChartProp
         .attr('stroke', 'rgba(100, 116, 139, 0.5)')
         .attr('stroke-width', 0.5);
     }
-    
+
     // Create tooltip
     const tooltip = d3.select(tooltipRef.current);
-    
+
     // Function to create a hexagon path
     const hexagonPath = (radius: number) => {
       const angles = d3.range(6).map(i => [
         radius * Math.cos(i * 2 * Math.PI / 6),
         radius * Math.sin(i * 2 * Math.PI / 6)
       ]);
-      
+
       return d3.line()
         .x(d => d[0])
         .y(d => d[1])
         (angles) + 'Z';
     };
-    
+
     // Create color scale based on selected data type
     let colorScale;
-    
+
     if (dataType === 'avgSalary') {
       colorScale = d3.scaleSequential()
         .domain([mapData.maxSalary * 0.3, mapData.maxSalary])
@@ -330,16 +330,16 @@ export default function GeographicMapChart({ isLoading }: GeographicMapChartProp
         .domain([0, mapData.maxJobCount])
         .interpolator(d3.interpolate('#0c4a6e', '#0ea5e9'));
     }
-    
+
     // Draw the hexagons for each region
     hexPositions.forEach(position => {
       const regionName = position.name;
       const regionData = mapData.regions[regionName];
-      
+
       // Calculate the center position
       const centerX = position.col * hexHorizontalSpacing;
       const centerY = position.row * hexVerticalSpacing + (position.col % 2 === 0 ? 0 : hexHeight / 2);
-      
+
       // Get value based on data type
       let value, normalizedValue;
       switch(dataType) {
@@ -355,7 +355,7 @@ export default function GeographicMapChart({ isLoading }: GeographicMapChartProp
           value = regionData.jobCount;
           normalizedValue = regionData.jobCount / mapData.maxJobCount;
       }
-      
+
       // Create gradient for hexagon
       const hexGradientId = `hex-gradient-${regionName.replace(/\s+/g, '')}`;
       const hexGradient = defs.append('radialGradient')
@@ -365,17 +365,17 @@ export default function GeographicMapChart({ isLoading }: GeographicMapChartProp
         .attr('r', '70%')
         .attr('fx', '50%')
         .attr('fy', '50%');
-        
+
       hexGradient.append('stop')
         .attr('offset', '0%')
         .attr('stop-color', colorScale(value))
         .attr('stop-opacity', 0.9);
-        
+
       hexGradient.append('stop')
         .attr('offset', '100%')
         .attr('stop-color', colorScale(value))
         .attr('stop-opacity', 0.5);
-      
+
       // Create glow effect
       const glowId = `glow-${regionName.replace(/\s+/g, '')}`;
       const glow = defs.append('filter')
@@ -384,16 +384,16 @@ export default function GeographicMapChart({ isLoading }: GeographicMapChartProp
         .attr('height', '300%')
         .attr('x', '-50%')
         .attr('y', '-50%');
-        
+
       glow.append('feGaussianBlur')
         .attr('stdDeviation', '5')
         .attr('result', 'blur');
-        
+
       glow.append('feComposite')
         .attr('in', 'SourceGraphic')
         .attr('in2', 'blur')
         .attr('operator', 'over');
-      
+
       // Draw background glow hexagon
       svg.append('path')
         .attr('d', hexagonPath(hexRadius * 1.2))
@@ -401,7 +401,7 @@ export default function GeographicMapChart({ isLoading }: GeographicMapChartProp
         .attr('fill', colorScale(value))
         .attr('opacity', 0.2)
         .attr('filter', `url(#${glowId})`);
-      
+
       // Draw hexagon
       const hexagon = svg.append('path')
         .attr('d', hexagonPath(hexRadius))
@@ -412,14 +412,14 @@ export default function GeographicMapChart({ isLoading }: GeographicMapChartProp
         .attr('stroke-opacity', 0.8)
         .style('cursor', 'pointer')
         .style('transition', 'all 0.3s ease');
-      
+
       // Add interaction
       hexagon.on('mouseover', function() {
         d3.select(this)
           .attr('stroke', '#fff')
           .attr('stroke-width', 2)
           .attr('stroke-opacity', 1);
-          
+
         // Format value based on data type
         let displayValue;
         if (dataType === 'avgSalary') {
@@ -429,7 +429,7 @@ export default function GeographicMapChart({ isLoading }: GeographicMapChartProp
         } else {
           displayValue = value.toLocaleString();
         }
-        
+
         // Update tooltip content
         tooltip
           .style('opacity', 1)
@@ -461,13 +461,13 @@ export default function GeographicMapChart({ isLoading }: GeographicMapChartProp
             .attr('stroke-width', 1.5)
             .attr('stroke-opacity', 0.8);
         }
-        
+
         tooltip.style('opacity', 0);
       })
       .on('click', function() {
         setSelectedRegion(regionName === selectedRegion ? null : regionName);
       });
-      
+
       // Add region label
       svg.append('text')
         .attr('x', centerX)
@@ -478,7 +478,7 @@ export default function GeographicMapChart({ isLoading }: GeographicMapChartProp
         .attr('font-weight', 'bold')
         .style('text-shadow', '0 1px 3px rgba(0,0,0,0.8)')
         .text(regionName);
-      
+
       // Add value label
       svg.append('text')
         .attr('x', centerX)
@@ -490,7 +490,7 @@ export default function GeographicMapChart({ isLoading }: GeographicMapChartProp
         .text(dataType === 'avgSalary' ? formatCurrency(value) : 
              dataType === 'growthRate' ? `${value}%` : 
              value.toLocaleString());
-      
+
       // Add a pulse animation for the selected region
       if (regionName === selectedRegion) {
         const pulseCircle = svg.append('circle')
@@ -501,14 +501,14 @@ export default function GeographicMapChart({ isLoading }: GeographicMapChartProp
           .attr('stroke', '#fff')
           .attr('stroke-width', 2)
           .attr('opacity', 0.6);
-          
+
         pulseCircle.append('animate')
           .attr('attributeName', 'r')
           .attr('from', hexRadius)
           .attr('to', hexRadius * 1.3)
           .attr('dur', '1.5s')
           .attr('repeatCount', 'indefinite');
-          
+
         pulseCircle.append('animate')
           .attr('attributeName', 'opacity')
           .attr('from', 0.6)
@@ -517,13 +517,13 @@ export default function GeographicMapChart({ isLoading }: GeographicMapChartProp
           .attr('repeatCount', 'indefinite');
       }
     });
-    
+
     // Add legend
     const legendWidth = 180;
     const legendHeight = 15;
     const legendX = width - legendWidth - 20;
     const legendY = height - 40;
-    
+
     // Legend gradient
     const legendGradId = `legend-gradient-${dataType}`;
     const legendGradient = defs.append('linearGradient')
@@ -532,12 +532,12 @@ export default function GeographicMapChart({ isLoading }: GeographicMapChartProp
       .attr('x2', '100%')
       .attr('y1', '0%')
       .attr('y2', '0%');
-      
+
     if (dataType === 'avgSalary') {
       legendGradient.append('stop')
         .attr('offset', '0%')
         .attr('stop-color', '#064e3b');
-        
+
       legendGradient.append('stop')
         .attr('offset', '100%')
         .attr('stop-color', '#10b981');
@@ -545,7 +545,7 @@ export default function GeographicMapChart({ isLoading }: GeographicMapChartProp
       legendGradient.append('stop')
         .attr('offset', '0%')
         .attr('stop-color', '#78350f');
-        
+
       legendGradient.append('stop')
         .attr('offset', '100%')
         .attr('stop-color', '#f59e0b');
@@ -553,12 +553,12 @@ export default function GeographicMapChart({ isLoading }: GeographicMapChartProp
       legendGradient.append('stop')
         .attr('offset', '0%')
         .attr('stop-color', '#0c4a6e');
-        
+
       legendGradient.append('stop')
         .attr('offset', '100%')
         .attr('stop-color', '#0ea5e9');
     }
-    
+
     // Legend background
     svg.append('rect')
       .attr('x', legendX - 10)
@@ -568,7 +568,7 @@ export default function GeographicMapChart({ isLoading }: GeographicMapChartProp
       .attr('fill', '#1e293b')
       .attr('opacity', 0.7)
       .attr('rx', 5);
-    
+
     // Legend bar
     svg.append('rect')
       .attr('x', legendX)
@@ -577,7 +577,7 @@ export default function GeographicMapChart({ isLoading }: GeographicMapChartProp
       .attr('height', legendHeight)
       .attr('fill', `url(#${legendGradId})`)
       .attr('rx', 3);
-    
+
     // Legend title
     let legendTitle: string;
     switch(dataType) {
@@ -591,7 +591,7 @@ export default function GeographicMapChart({ isLoading }: GeographicMapChartProp
       default:
         legendTitle = 'Job Count';
     }
-    
+
     svg.append('text')
       .attr('x', legendX)
       .attr('y', legendY - 5)
@@ -599,7 +599,7 @@ export default function GeographicMapChart({ isLoading }: GeographicMapChartProp
       .attr('fill', '#e2e8f0')
       .attr('font-size', '12px')
       .text(legendTitle);
-    
+
     // Legend min value
     svg.append('text')
       .attr('x', legendX)
@@ -610,7 +610,7 @@ export default function GeographicMapChart({ isLoading }: GeographicMapChartProp
       .text(dataType === 'avgSalary' ? formatCurrency(mapData.maxSalary * 0.3) : 
            dataType === 'growthRate' ? '0%' : 
            '0');
-    
+
     // Legend max value
     svg.append('text')
       .attr('x', legendX + legendWidth)
@@ -621,21 +621,21 @@ export default function GeographicMapChart({ isLoading }: GeographicMapChartProp
       .text(dataType === 'avgSalary' ? formatCurrency(mapData.maxSalary) : 
            dataType === 'growthRate' ? `${mapData.maxGrowthRate}%` : 
            mapData.maxJobCount.toLocaleString());
-    
+
   }, [isLoading, dataType, mapData, selectedRegion]);
-  
+
   // Effect to update the details panel when a region is selected
   useEffect(() => {
     if (!detailsRef.current || !selectedRegion) return;
-    
+
     const detailsPanel = d3.select(detailsRef.current);
     const regionData = mapData.regions[selectedRegion];
-    
+
     if (!regionData) return;
-    
+
     // Clear existing content
     detailsPanel.html('');
-    
+
     // Add region header
     detailsPanel.append('div')
       .attr('class', 'flex justify-between items-center mb-4')
@@ -648,12 +648,12 @@ export default function GeographicMapChart({ isLoading }: GeographicMapChartProp
           <span class="material-icons text-lg" id="close-details">close</span>
         </button>
       `);
-    
+
     // Add event listener to close button
     document.getElementById('close-details')?.addEventListener('click', () => {
       setSelectedRegion(null);
     });
-    
+
     // Add stats overview
     detailsPanel.append('div')
       .attr('class', 'grid grid-cols-3 gap-2 mb-4')
@@ -671,7 +671,7 @@ export default function GeographicMapChart({ isLoading }: GeographicMapChartProp
           <div class="text-gray-400 text-xs">Growth</div>
         </div>
       `);
-    
+
     // Add toggle buttons
     detailsPanel.append('div')
       .attr('class', 'flex space-x-2 mb-4')
@@ -683,47 +683,47 @@ export default function GeographicMapChart({ isLoading }: GeographicMapChartProp
           Top Positions
         </button>
       `);
-    
+
     // Add event listeners to toggle buttons
     document.getElementById('industries-toggle')?.addEventListener('click', () => {
       setShowIndustryDetails(true);
     });
-    
+
     document.getElementById('positions-toggle')?.addEventListener('click', () => {
       setShowIndustryDetails(false);
     });
-    
+
     // Show either industries or positions breakdown
     if (showIndustryDetails) {
       // Add industries breakdown
       const industriesDiv = detailsPanel.append('div')
         .attr('class', 'space-y-3');
-      
+
       industriesDiv.append('h4')
         .attr('class', 'text-sm font-semibold text-white')
         .html('Top Industries');
-      
+
       // Create bars for each industry
       regionData.topIndustries.forEach(industry => {
         const maxCount = Math.max(...regionData.topIndustries.map(i => i.count));
         const percentage = (industry.count / maxCount) * 100;
-        
+
         const industryBar = industriesDiv.append('div')
           .attr('class', 'space-y-1');
-          
+
         industryBar.append('div')
           .attr('class', 'flex justify-between text-xs')
           .html(`
             <span class="text-white">${industry.name}</span>
             <span class="text-gray-400">${industry.count.toLocaleString()} jobs</span>
           `);
-          
+
         industryBar.append('div')
           .attr('class', 'h-2 bg-gray-700 rounded overflow-hidden')
           .append('div')
           .attr('class', `h-full rounded ${dataType === 'avgSalary' ? 'bg-emerald-500' : dataType === 'growthRate' ? 'bg-amber-500' : 'bg-blue-500'}`)
           .style('width', `${percentage}%`);
-          
+
         industryBar.append('div')
           .attr('class', 'flex justify-between text-xs')
           .html(`
@@ -735,11 +735,11 @@ export default function GeographicMapChart({ isLoading }: GeographicMapChartProp
       // Add positions breakdown
       const positionsDiv = detailsPanel.append('div')
         .attr('class', 'space-y-3');
-      
+
       positionsDiv.append('h4')
         .attr('class', 'text-sm font-semibold text-white')
         .html('Top Positions');
-      
+
       // Create list for each position
       regionData.topPositions.forEach((position, index) => {
         positionsDiv.append('div')
@@ -762,9 +762,9 @@ export default function GeographicMapChart({ isLoading }: GeographicMapChartProp
           `);
       });
     }
-    
+
   }, [selectedRegion, showIndustryDetails, mapData, dataType]);
-  
+
   if (isLoading) {
     return (
       <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-lg shadow overflow-hidden border border-gray-700 h-full flex flex-col md:col-span-2">
@@ -782,7 +782,7 @@ export default function GeographicMapChart({ isLoading }: GeographicMapChartProp
       </div>
     );
   }
-  
+
   return (
     <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-lg shadow overflow-hidden border border-gray-700 h-full flex flex-col md:col-span-2">
       <div className="p-2 border-b border-gray-700 flex items-center justify-between">
@@ -850,7 +850,7 @@ export default function GeographicMapChart({ isLoading }: GeographicMapChartProp
             </>
           )}
         </div>
-        
+
         {selectedRegion && (
           <div className="mt-2 bg-gray-800/30 rounded p-2 border border-gray-700 flex flex-wrap gap-1">
             {mapData.regions[selectedRegion].topIndustries.slice(0, 2).map(industry => (

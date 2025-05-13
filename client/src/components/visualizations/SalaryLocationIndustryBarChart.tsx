@@ -104,9 +104,13 @@ export default function SalaryLocationIndustryBarChart({ data, isLoading }: Sala
       .append('g')
       .attr('transform', `translate(${margin.left},${margin.top})`);
 
-    // Filter the data to only include active industries
+    // Don't filter industries - we'll show all of them but with different styling
     const filteredLocations = data.locations.slice(0, 10); // Limit to top 10 locations for readability
-
+    
+    // Use all industries for domain to maintain consistent bar positions
+    // This is crucial - we want to keep showing all industries but highlight the active ones
+    const allIndustries = data.industries;
+    
     // Create the X scale
     const x0 = d3.scaleBand()
       .domain(filteredLocations)
@@ -114,14 +118,14 @@ export default function SalaryLocationIndustryBarChart({ data, isLoading }: Sala
       .paddingInner(0.1);
 
     const x1 = d3.scaleBand()
-      .domain(activeIndustries)
+      .domain(allIndustries) // Use all industries, not just active ones
       .rangeRound([0, x0.bandwidth()])
       .padding(0.05);
 
-    // Find max salary for Y scale
+    // Find max salary for Y scale across ALL industries for stable scaling
     let maxSalary = 0;
     filteredLocations.forEach(location => {
-      activeIndustries.forEach(industry => {
+      allIndustries.forEach(industry => {
         if (data.data[location] && data.data[location][industry]) {
           maxSalary = Math.max(maxSalary, data.data[location][industry] || 0);
         }
@@ -162,19 +166,23 @@ export default function SalaryLocationIndustryBarChart({ data, isLoading }: Sala
     // Create tooltip
     const tooltip = d3.select(tooltipRef.current);
 
-    // Create the grouped bars
+    // Create the grouped bars for ALL industries
     filteredLocations.forEach(location => {
-      activeIndustries.forEach(industry => {
+      allIndustries.forEach(industry => {
         if (data.data[location] && data.data[location][industry]) {
+          const isActive = activeIndustries.includes(industry);
+          
           g.append('rect')
             .attr('x', x0(location)! + x1(industry)!)
             .attr('y', y(data.data[location][industry] || 0))
             .attr('width', x1.bandwidth())
             .attr('height', height - y(data.data[location][industry] || 0))
-            .attr('fill', getIndustryColor(industry, true))
+            .attr('fill', getIndustryColor(industry, isActive))
             .attr('rx', 2) // Rounded corners for futuristic look
             .attr('ry', 2)
-            .style('filter', 'drop-shadow(0px 2px 3px rgba(0,0,0,0.2))') // Subtle shadow
+            .attr('opacity', isActive ? 1 : 0.3) // Fade out inactive industries
+            .style('filter', isActive ? 
+              'drop-shadow(0px 2px 3px rgba(0,0,0,0.2))' : 'none') // Subtle shadow for active only
             .on('mouseover', function() {
               d3.select(this)
                 .attr('stroke', '#fff')
@@ -220,13 +228,13 @@ export default function SalaryLocationIndustryBarChart({ data, isLoading }: Sala
       });
     });
 
-    // Add legend
+    // Add legend with ALL industries, but style based on selection
     const legend = g.append('g')
       .attr('font-family', 'sans-serif')
       .attr('font-size', 10)
       .attr('text-anchor', 'start')
       .selectAll('g')
-      .data(activeIndustries)
+      .data(allIndustries)
       .enter().append('g')
       .attr('transform', (d, i) => `translate(${width + 10},${i * 20})`)
       .style('cursor', 'pointer')
@@ -255,13 +263,15 @@ export default function SalaryLocationIndustryBarChart({ data, isLoading }: Sala
       .attr('height', 15)
       .attr('rx', 2)
       .attr('ry', 2)
-      .attr('fill', d => getIndustryColor(d, true));
+      .attr('fill', d => getIndustryColor(d, activeIndustries.includes(d)))
+      .attr('opacity', d => activeIndustries.includes(d) ? 1 : 0.3);
 
     legend.append('text')
       .attr('x', 20)
       .attr('y', 7.5)
       .attr('dy', '0.32em')
-      .text(d => d);
+      .attr('fill', d => activeIndustries.includes(d) ? '#ffffff' : '#9ca3af')
+      .text(d => d + (activeIndustries.includes(d) ? ' ✓' : ''));
 
     // Add responsive resize handler
     const handleResize = () => {

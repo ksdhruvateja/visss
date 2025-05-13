@@ -64,9 +64,11 @@ export default function SalaryPostingDateScatter({ data, isLoading }: SalaryPost
     g.selectAll('.domain, .tick line')
       .style('stroke', '#4b5563');
 
-    // Add Y axis
+    // Add Y axis with fewer ticks to prevent overlapping
     g.append('g')
-      .call(d3.axisLeft(y).tickFormat(d => formatCurrency(+d)))
+      .call(d3.axisLeft(y)
+        .tickFormat(d => formatCurrency(+d))
+        .ticks(6)) // Reduce number of ticks to prevent overlap
       .selectAll('text')
       .style('font-size', '12px')
       .style('fill', '#e2e8f0'); // Light color for better visibility

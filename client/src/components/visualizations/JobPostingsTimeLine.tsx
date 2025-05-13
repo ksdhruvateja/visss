@@ -82,9 +82,11 @@ export default function JobPostingsTimeLine({ data, isLoading }: JobPostingsTime
           weekGroups[weekOfYear].count += 1;
         });
         
-        // Calculate averages
+        // Calculate averages and format without "Week" prefix
         Object.entries(weekGroups).forEach(([week, stats]) => {
-          aggregatedData[expLevel][`Week ${week}`] = Math.round(stats.sum / stats.count);
+          // Get date of the first day of the week
+          const weekDate = getDateOfWeek(parseInt(week));
+          aggregatedData[expLevel][`${format(weekDate, 'MMM dd')}`] = Math.round(stats.sum / stats.count);
         });
       });
       
@@ -151,6 +153,23 @@ export default function JobPostingsTimeLine({ data, isLoading }: JobPostingsTime
     const startOfYear = new Date(date.getFullYear(), 0, 1);
     const days = Math.floor((date.getTime() - startOfYear.getTime()) / (24 * 60 * 60 * 1000));
     return Math.ceil((days + startOfYear.getDay() + 1) / 7).toString();
+  };
+  
+  // Helper function to get the date of a specific week number
+  const getDateOfWeek = (weekNum: number) => {
+    // Create a date object for January 1st of the current year
+    const year = new Date().getFullYear();
+    const januaryFirst = new Date(year, 0, 1);
+    
+    // Calculate days to add to get to the first day of the requested week
+    // Week 1 starts on the first day of the year
+    const daysToAdd = (weekNum - 1) * 7;
+    
+    // Create date for the first day of the requested week
+    const result = new Date(januaryFirst);
+    result.setDate(januaryFirst.getDate() + daysToAdd);
+    
+    return result;
   };
   
   // Helper function to get quarter from date string

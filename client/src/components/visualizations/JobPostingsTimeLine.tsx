@@ -308,14 +308,27 @@ export default function JobPostingsTimeLine({ data, isLoading }: JobPostingsTime
         .curve(d3.curveMonotoneX);
       
       // Draw the line with enhanced interactivity
+      const isLevelSelected = filters.experienceLevels.includes(level);
+      const isAnyFilterActive = filters.experienceLevels.length > 0;
+      
+      // Calculate proper class based on selection state
+      let lineClass = 'timeline-line';
+      if (isLevelSelected) {
+        lineClass += ' selected';
+      } else if (isAnyFilterActive) {
+        lineClass += ' faded';
+      }
+      
       g.append('path')
         .datum(lineData)
-        .attr('class', 'timeline-line')
+        .attr('class', lineClass)
         .attr('fill', 'none')
         .attr('stroke', levelColors[level] || d3.schemeCategory10[aggregatedData.experienceLevels.indexOf(level) % 10])
-        .attr('stroke-width', 2.5)
+        .attr('stroke-width', isLevelSelected ? 4 : 2.5)
         .attr('data-level', level) // Add data attribute for filtering
-        .style('filter', 'drop-shadow(0px 2px 4px rgba(0,0,0,0.3))')
+        .style('filter', isLevelSelected 
+          ? 'drop-shadow(0px 0px 8px rgba(255,255,255,0.7))' 
+          : 'drop-shadow(0px 2px 4px rgba(0,0,0,0.3))')
         .style('cursor', 'pointer')
         .attr('d', linePath)
         .on('mouseover', function(event) {
@@ -329,15 +342,34 @@ export default function JobPostingsTimeLine({ data, isLoading }: JobPostingsTime
           
           // Show tooltip with experience level info
           const avgJobCount = lineData.reduce((sum, d) => sum + d.count, 0) / lineData.length;
+          const maxJobCount = Math.max(...lineData.map(d => d.count));
+          const minJobCount = Math.min(...lineData.map(d => d.count));
+          const totalJobs = lineData.reduce((sum, d) => sum + d.count, 0);
+          
+          // Get growth trend
+          const firstValue = lineData[0].count;
+          const lastValue = lineData[lineData.length - 1].count;
+          const growth = lastValue > firstValue 
+            ? `+${Math.round((lastValue - firstValue) / firstValue * 100)}%` 
+            : `${Math.round((lastValue - firstValue) / firstValue * 100)}%`;
           
           tooltip
             .style('opacity', 1)
             .style('left', `${event.pageX + 10}px`)
             .style('top', `${event.pageY - 20}px`)
             .html(`
-              <div class="font-medium">${level}</div>
-              <div>Average Jobs: ${Math.round(avgJobCount)}</div>
-              <div class="text-xs italic">Click to filter</div>
+              <div class="text-sm font-medium mb-1">${level}</div>
+              <div class="grid grid-cols-2 gap-x-2 text-xs">
+                <div>Total Jobs:</div>
+                <div class="text-right font-medium">${totalJobs.toLocaleString()}</div>
+                <div>Average:</div>
+                <div class="text-right font-medium">${Math.round(avgJobCount).toLocaleString()}</div>
+                <div>Peak Count:</div>
+                <div class="text-right font-medium">${maxJobCount.toLocaleString()}</div>
+                <div>Growth:</div>
+                <div class="text-right font-medium ${lastValue > firstValue ? 'text-green-400' : 'text-red-400'}">${growth}</div>
+              </div>
+              <div class="text-xs italic mt-1">Click to filter</div>
             `);
         })
         .on('mousemove', function(event) {
@@ -623,6 +655,40 @@ export default function JobPostingsTimeLine({ data, isLoading }: JobPostingsTime
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, [data, isLoading, visibleExperienceLevels, timeInterval, brushExtent, aggregatedData, redrawTrigger]);
+  
+  // Effect to update line styling based on filtered experience levels
+  useEffect(() => {
+    if (!svgRef.current || isLoading || !data) return;
+    
+    // Get all timeline lines
+    const lines = d3.select(svgRef.current)
+      .selectAll('.timeline-line');
+    
+    // Update classes based on filter selections
+    lines.each(function() {
+      const line = d3.select(this);
+      const level = line.attr('data-level');
+      
+      if (!level) return; // Skip if no level attribute
+      
+      // Check if this level is in the filters
+      const isSelected = filters.experienceLevels.includes(level);
+      
+      // Update class based on selection state
+      if (isSelected) {
+        line.classed('selected', true)
+            .classed('faded', false);
+      } else if (filters.experienceLevels.length > 0) {
+        // If some filters are active but this one isn't selected
+        line.classed('selected', false)
+            .classed('faded', true);
+      } else {
+        // No filters active
+        line.classed('selected', false)
+            .classed('faded', false);
+      }
+    });
+  }, [filters.experienceLevels, data, isLoading]);
 
   if (isLoading) {
     return (

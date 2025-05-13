@@ -199,11 +199,28 @@ export default function JobPostingsTimeLine({ data, isLoading }: JobPostingsTime
       .attr('class', 'chart-group')
       .attr('transform', `translate(${margin.left},${margin.top})`);
 
-    // Parse dates
+    // Parse dates with support for different formats
     const parseDate = (dateString: string) => {
-      // Assume format is YYYY-MM
-      const [year, month] = dateString.split('-').map(Number);
-      return new Date(year, month - 1);
+      // Handle different date formats
+      if (dateString.includes('-')) {
+        // Standard format: YYYY-MM
+        const [year, month] = dateString.split('-').map(Number);
+        return new Date(year, month - 1);
+      } else if (dateString.includes('Q')) {
+        // Quarter format: Q1 2023, Q2 2023, etc.
+        const [quarter, year] = dateString.split(' ');
+        const quarterNum = parseInt(quarter.substring(1));
+        const month = (quarterNum - 1) * 3; // Q1=0, Q2=3, Q3=6, Q4=9
+        return new Date(parseInt(year), month);
+      } else {
+        // Weekly format: Jan 01, Feb 15, etc.
+        try {
+          return new Date(dateString);
+        } catch (e) {
+          console.error(`Error parsing date: ${dateString}`, e);
+          return new Date(); // Fallback
+        }
+      }
     };
     
     // Create X scale
@@ -290,14 +307,83 @@ export default function JobPostingsTimeLine({ data, isLoading }: JobPostingsTime
         .y(d => y(d.count))
         .curve(d3.curveMonotoneX);
       
-      // Draw the line
+      // Draw the line with enhanced interactivity
       g.append('path')
         .datum(lineData)
+        .attr('class', 'timeline-line')
         .attr('fill', 'none')
         .attr('stroke', levelColors[level] || d3.schemeCategory10[aggregatedData.experienceLevels.indexOf(level) % 10])
         .attr('stroke-width', 2.5)
+        .attr('data-level', level) // Add data attribute for filtering
         .style('filter', 'drop-shadow(0px 2px 4px rgba(0,0,0,0.3))')
-        .attr('d', linePath);
+        .style('cursor', 'pointer')
+        .attr('d', linePath)
+        .on('mouseover', function(event) {
+          // Highlight the line
+          d3.select(this)
+            .attr('stroke-width', 4)
+            .style('filter', 'drop-shadow(0px 0px 8px rgba(255,255,255,0.5))');
+            
+          // Set active item in filter context
+          setActiveItem({ type: 'experienceLevel', value: level });
+          
+          // Show tooltip with experience level info
+          const avgJobCount = lineData.reduce((sum, d) => sum + d.count, 0) / lineData.length;
+          
+          tooltip
+            .style('opacity', 1)
+            .style('left', `${event.pageX + 10}px`)
+            .style('top', `${event.pageY - 20}px`)
+            .html(`
+              <div class="font-medium">${level}</div>
+              <div>Average Jobs: ${Math.round(avgJobCount)}</div>
+              <div class="text-xs italic">Click to filter</div>
+            `);
+        })
+        .on('mousemove', function(event) {
+          tooltip
+            .style('left', `${event.pageX + 10}px`)
+            .style('top', `${event.pageY - 20}px`);
+        })
+        .on('mouseout', function() {
+          // Reset line style if not selected
+          const isLevelSelected = filters.experienceLevels.includes(level);
+          if (!isLevelSelected) {
+            d3.select(this)
+              .attr('stroke-width', 2.5)
+              .style('filter', 'drop-shadow(0px 2px 4px rgba(0,0,0,0.3))');
+          }
+          
+          // Reset active item
+          setActiveItem({ type: null, value: null });
+          
+          // Hide tooltip
+          tooltip.style('opacity', 0);
+        })
+        .on('click', function() {
+          // Toggle this experience level in filters
+          const newFilters = { ...filters };
+          const isLevelSelected = newFilters.experienceLevels.includes(level);
+          
+          if (isLevelSelected) {
+            // Remove this level from filters
+            newFilters.experienceLevels = newFilters.experienceLevels.filter(l => l !== level);
+          } else {
+            // Add this level to filters
+            newFilters.experienceLevels = [...newFilters.experienceLevels, level];
+          }
+          
+          // Update filters
+          setFilters(newFilters);
+          
+          // Update visible levels for the chart
+          const isCurrentlyVisible = visibleExperienceLevels.includes(level);
+          if (isCurrentlyVisible && visibleExperienceLevels.length > 1) {
+            setVisibleExperienceLevels(visibleExperienceLevels.filter(l => l !== level));
+          } else if (!isCurrentlyVisible) {
+            setVisibleExperienceLevels([...visibleExperienceLevels, level]);
+          }
+        });
       
       // Add dots for each data point
       g.selectAll(`dot-${level.replace(/\s+/g, '-')}`)

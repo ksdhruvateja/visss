@@ -13,12 +13,23 @@
 
 /* Timeline chart hover effects */
 .timeline-line {
-  transition: stroke-width 0.2s ease, filter 0.3s ease;
+  transition: stroke-width 0.2s ease, filter 0.3s ease, opacity 0.3s ease;
 }
 
 .timeline-line:hover {
   stroke-width: 4px !important;
   filter: drop-shadow(0px 0px 6px rgba(255,255,255,0.5)) !important;
+  opacity: 1 !important;
+}
+
+.timeline-line.selected {
+  stroke-width: 4px !important;
+  filter: drop-shadow(0px 0px 8px rgba(255,255,255,0.7)) !important;
+  opacity: 1 !important;
+}
+
+.timeline-line.faded {
+  opacity: 0.3;
 }
 
 :root {

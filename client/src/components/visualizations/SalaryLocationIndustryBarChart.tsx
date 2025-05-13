@@ -259,34 +259,30 @@ export default function SalaryLocationIndustryBarChart({ data, isLoading }: Sala
   }, [data, isLoading, activeIndustries]);
 
   const toggleIndustry = (industry: string) => {
-    // Update local chart state
-    setActiveIndustries(prev => {
-      if (prev.includes(industry)) {
-        return prev.filter(i => i !== industry);
-      } else {
-        return [...prev, industry];
-      }
+    // Update local chart state - always toggle the clicked industry
+    const newActiveIndustries = activeIndustries.includes(industry)
+      ? activeIndustries.filter(i => i !== industry) // Remove if present
+      : [...activeIndustries, industry]; // Add if not present
+    
+    setActiveIndustries(newActiveIndustries);
+
+    // Update global filter context to match exactly
+    const newIndustryFilters = filters.industries.includes(industry)
+      ? filters.industries.filter(i => i !== industry) // Remove if present
+      : [...filters.industries, industry]; // Add if not present
+    
+    setFilters({
+      ...filters,
+      industries: newIndustryFilters
     });
 
-    // Update global filter context
-    if (filters.industries.includes(industry)) {
-      // Remove industry from global filters
-      setFilters({
-        ...filters,
-        industries: filters.industries.filter(i => i !== industry)
-      });
-      // Clear active item if it's the same industry
-      if (activeItem.type === 'industry' && activeItem.value === industry) {
-        setActiveItem({ type: null, value: null });
-      }
-    } else {
-      // Add industry to global filters
-      setFilters({
-        ...filters,
-        industries: [...filters.industries, industry]
-      });
-      // Set as active item to highlight in other charts
+    // Update active item state for cross-chart highlighting
+    if (newActiveIndustries.includes(industry) && !activeIndustries.includes(industry)) {
+      // Highlight this industry when it's newly added
       setActiveItem({ type: 'industry', value: industry });
+    } else if (activeItem.type === 'industry' && activeItem.value === industry) {
+      // Clear active item if it's the same industry being removed
+      setActiveItem({ type: null, value: null });
     }
   };
 
@@ -343,7 +339,15 @@ export default function SalaryLocationIndustryBarChart({ data, isLoading }: Sala
                 size="sm"
                 variant="ghost"
                 className="h-5 px-2 py-0 text-xs text-gray-400 hover:text-white"
-                onClick={() => setActiveIndustries(data.industries)}
+                onClick={() => {
+                  // Update local state
+                  setActiveIndustries(data.industries);
+                  // Update global filters to match
+                  setFilters({
+                    ...filters,
+                    industries: data.industries
+                  });
+                }}
               >
                 Select All
               </Button>
@@ -351,7 +355,17 @@ export default function SalaryLocationIndustryBarChart({ data, isLoading }: Sala
                 size="sm"
                 variant="ghost"
                 className="h-5 px-2 py-0 text-xs text-gray-400 hover:text-white"
-                onClick={() => setActiveIndustries([])}
+                onClick={() => {
+                  // Update local state
+                  setActiveIndustries([]);
+                  // Update global filters to match
+                  setFilters({
+                    ...filters,
+                    industries: []
+                  });
+                  // Clear active item
+                  setActiveItem({ type: null, value: null });
+                }}
               >
                 Clear
               </Button>
@@ -370,15 +384,53 @@ export default function SalaryLocationIndustryBarChart({ data, isLoading }: Sala
                 onClick={(e) => {
                   e.preventDefault();
                   if (e.shiftKey || e.ctrlKey || e.metaKey) {
-                    // Toggle single industry
-                    toggleIndustry(industry);
+                    // Toggle single industry without affecting others - multi-select mode
+                    setActiveIndustries(prev => {
+                      if (prev.includes(industry)) {
+                        return prev.filter(i => i !== industry);
+                      } else {
+                        return [...prev, industry];
+                      }
+                    });
+                    
+                    // Update global filters to match
+                    setFilters(prev => {
+                      if (prev.industries.includes(industry)) {
+                        return {
+                          ...prev,
+                          industries: prev.industries.filter(i => i !== industry)
+                        };
+                      } else {
+                        return {
+                          ...prev,
+                          industries: [...prev.industries, industry]
+                        };
+                      }
+                    });
                   } else {
                     // Set as single selection if not already selected
                     if (activeIndustries.length === 1 && activeIndustries[0] === industry) {
                       setActiveIndustries([]);
+                      // Clear filter for this industry
+                      setFilters({
+                        ...filters,
+                        industries: filters.industries.filter(i => i !== industry)
+                      });
                     } else {
                       setActiveIndustries([industry]);
+                      // Replace industries filter with just this one
+                      setFilters({
+                        ...filters,
+                        industries: [industry]
+                      });
                     }
+                  }
+                  
+                  // Update the active item state for cross-chart highlighting
+                  if (!activeIndustries.includes(industry)) {
+                    setActiveItem({ type: 'industry', value: industry });
+                  } else {
+                    setActiveItem({ type: null, value: null });
                   }
                 }}
               >

@@ -17,7 +17,7 @@ export default function SalaryLocationIndustryBarChart({ data, isLoading }: Sala
   const tooltipRef = useRef<HTMLDivElement | null>(null);
   const [activeIndustries, setActiveIndustries] = useState<string[]>([]);
   const { filters, setFilters, activeItem, setActiveItem } = useFilterContext();
-  
+
   // Set top 3 industries as active by default once data loads
   useEffect(() => {
     if (!isLoading && data && data.industries && data.industries.length > 0) {
@@ -34,31 +34,31 @@ export default function SalaryLocationIndustryBarChart({ data, isLoading }: Sala
           const industryTotals = data.industries.map(industry => {
             let total = 0;
             let count = 0;
-            
+
             data.locations.forEach(location => {
               if (data.data[location] && data.data[location][industry] > 0) {
                 total += data.data[location][industry];
                 count++;
               }
             });
-            
+
             return {
               industry,
               avgSalary: count > 0 ? total / count : 0
             };
           });
-          
+
           const topIndustries = industryTotals
             .sort((a, b) => b.avgSalary - a.avgSalary)
             .slice(0, 3)
             .map(item => item.industry);
-            
+
           setActiveIndustries(topIndustries);
         }
       }
     }
   }, [data, isLoading, activeIndustries, filters.industries]);
-  
+
   // Highlight industries based on active item in other charts
   useEffect(() => {
     if (activeItem.type === 'industry' && activeItem.value && data?.industries.includes(activeItem.value)) {
@@ -83,7 +83,7 @@ export default function SalaryLocationIndustryBarChart({ data, isLoading }: Sala
       Telecommunication: isActive ? '#7C3AED' : '#C4B5FD',
       Entertainment: isActive ? '#F97316' : '#FDBA74'
     };
-    
+
     return colors[industry] || (isActive ? '#6B7280' : '#D1D5DB');
   };
 
@@ -183,13 +183,13 @@ export default function SalaryLocationIndustryBarChart({ data, isLoading }: Sala
                 .transition()
                 .duration(200)
                 .attr('opacity', 0.9);
-              
+
               // Notify other charts about hover
               setActiveItem({ 
                 type: 'industry', 
                 value: industry 
               });
-                
+
               tooltip
                 .style('opacity', 1)
                 .html(`
@@ -210,10 +210,10 @@ export default function SalaryLocationIndustryBarChart({ data, isLoading }: Sala
                 .transition()
                 .duration(200)
                 .attr('opacity', 1);
-              
+
               // Reset active item when not hovering
               setActiveItem({ type: null, value: null });
-                
+
               tooltip.style('opacity', 0);
             });
         }
@@ -267,7 +267,7 @@ export default function SalaryLocationIndustryBarChart({ data, isLoading }: Sala
         return [...prev, industry];
       }
     });
-    
+
     // Update global filter context
     if (filters.industries.includes(industry)) {
       // Remove industry from global filters
@@ -333,26 +333,31 @@ export default function SalaryLocationIndustryBarChart({ data, isLoading }: Sala
         </h3>
       </div>
       <div className="p-2 flex-grow flex flex-col">
-        <div className="flex flex-col gap-1 mb-2">
-          <div className="flex items-center gap-1">
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-5 px-2 py-0 text-xs text-gray-400 hover:text-white"
-              onClick={() => setActiveIndustries(data.industries)}
-            >
-              Select All
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-5 px-2 py-0 text-xs text-gray-400 hover:text-white"
-              onClick={() => setActiveIndustries([])}
-            >
-              Clear All
-            </Button>
+        <div className="flex flex-col gap-2 mb-2">
+          <div className="flex items-center justify-between">
+            <div className="text-xs text-gray-400">
+              Selected: {activeIndustries.length || 'None'} 
+            </div>
+            <div className="flex gap-1">
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-5 px-2 py-0 text-xs text-gray-400 hover:text-white"
+                onClick={() => setActiveIndustries(data.industries)}
+              >
+                Select All
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-5 px-2 py-0 text-xs text-gray-400 hover:text-white"
+                onClick={() => setActiveIndustries([])}
+              >
+                Clear
+              </Button>
+            </div>
           </div>
-          <div className="flex flex-wrap gap-1 max-h-16 overflow-y-auto w-full">
+          <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto w-full">
             {data.industries.map(industry => (
               <Badge
                 key={industry}
@@ -363,16 +368,17 @@ export default function SalaryLocationIndustryBarChart({ data, isLoading }: Sala
                     : 'bg-gray-800 text-gray-400 border-gray-600 hover:border-gray-500'
                 }`}
                 onClick={(e) => {
-                  if (e.ctrlKey || e.metaKey) {
-                    // Add/remove single industry
+                  e.preventDefault();
+                  if (e.shiftKey || e.ctrlKey || e.metaKey) {
+                    // Toggle single industry
                     toggleIndustry(industry);
                   } else {
-                    // Set as single selection
-                    setActiveIndustries([industry]);
-                    setFilters({
-                      ...filters,
-                      industries: [industry]
-                    });
+                    // Set as single selection if not already selected
+                    if (activeIndustries.length === 1 && activeIndustries[0] === industry) {
+                      setActiveIndustries([]);
+                    } else {
+                      setActiveIndustries([industry]);
+                    }
                   }
                 }}
               >

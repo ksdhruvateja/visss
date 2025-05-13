@@ -231,7 +231,22 @@ export default function SalaryLocationIndustryBarChart({ data, isLoading }: Sala
       .attr('transform', (d, i) => `translate(${width + 10},${i * 20})`)
       .style('cursor', 'pointer')
       .on('click', (event, d) => {
-        toggleIndustry(d);
+        // Use a directly simplified version to avoid any potential issues
+        const newActiveIndustries = activeIndustries.includes(d)
+          ? activeIndustries.filter(i => i !== d) // Remove if present
+          : [...activeIndustries, d]; // Add if not present
+        
+        setActiveIndustries(newActiveIndustries);
+        
+        // Also update global filters
+        const newIndustryFilters = filters.industries.includes(d)
+          ? filters.industries.filter(i => i !== d) 
+          : [...filters.industries, d];
+        
+        setFilters({
+          ...filters,
+          industries: newIndustryFilters
+        });
       });
 
     legend.append('rect')
@@ -383,53 +398,29 @@ export default function SalaryLocationIndustryBarChart({ data, isLoading }: Sala
                 }`}
                 onClick={(e) => {
                   e.preventDefault();
-                  if (e.shiftKey || e.ctrlKey || e.metaKey) {
-                    // Toggle single industry without affecting others - multi-select mode
-                    setActiveIndustries(prev => {
-                      if (prev.includes(industry)) {
-                        return prev.filter(i => i !== industry);
-                      } else {
-                        return [...prev, industry];
-                      }
-                    });
-                    
-                    // Update global filters to match
-                    setFilters(prev => {
-                      if (prev.industries.includes(industry)) {
-                        return {
-                          ...prev,
-                          industries: prev.industries.filter(i => i !== industry)
-                        };
-                      } else {
-                        return {
-                          ...prev,
-                          industries: [...prev.industries, industry]
-                        };
-                      }
-                    });
-                  } else {
-                    // Set as single selection if not already selected
-                    if (activeIndustries.length === 1 && activeIndustries[0] === industry) {
-                      setActiveIndustries([]);
-                      // Clear filter for this industry
-                      setFilters({
-                        ...filters,
-                        industries: filters.industries.filter(i => i !== industry)
-                      });
-                    } else {
-                      setActiveIndustries([industry]);
-                      // Replace industries filter with just this one
-                      setFilters({
-                        ...filters,
-                        industries: [industry]
-                      });
-                    }
-                  }
+                  
+                  // Always handle as multi-select regardless of key modifiers
+                  // This allows for a more consistent UI behavior
+                  const newActiveIndustries = activeIndustries.includes(industry)
+                    ? activeIndustries.filter(i => i !== industry) // Remove if present
+                    : [...activeIndustries, industry]; // Add if not present
+                  
+                  setActiveIndustries(newActiveIndustries);
+                  
+                  // Update global filters to match exactly
+                  const newIndustryFilters = filters.industries.includes(industry)
+                    ? filters.industries.filter(i => i !== industry) // Remove if present
+                    : [...filters.industries, industry]; // Add if not present
+                  
+                  setFilters({
+                    ...filters,
+                    industries: newIndustryFilters
+                  });
                   
                   // Update the active item state for cross-chart highlighting
-                  if (!activeIndustries.includes(industry)) {
+                  if (newActiveIndustries.includes(industry) && !activeIndustries.includes(industry)) {
                     setActiveItem({ type: 'industry', value: industry });
-                  } else {
+                  } else if (activeItem.type === 'industry' && activeItem.value === industry) {
                     setActiveItem({ type: null, value: null });
                   }
                 }}

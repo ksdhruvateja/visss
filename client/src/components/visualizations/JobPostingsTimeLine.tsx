@@ -26,6 +26,8 @@ export default function JobPostingsTimeLine({
   >([]);
   const [brushExtent, setBrushExtent] = useState<[Date, Date] | null>(null);
   const [redrawTrigger, setRedrawTrigger] = useState(0);
+  const [isFilterMenuOpen, setIsFilterMenuOpen] = useState(false);
+  const filterMenuRef = useRef<HTMLDivElement | null>(null);
   const { filters, setFilters, activeItem, setActiveItem } = useFilterContext();
 
   // Set visible experience levels when data changes
@@ -754,6 +756,20 @@ export default function JobPostingsTimeLine({
     redrawTrigger,
   ]);
 
+  // Handle closing the filter menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (filterMenuRef.current && !filterMenuRef.current.contains(event.target as Node)) {
+        setIsFilterMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [filterMenuRef]);
+
   // Effect to update line styling based on filtered experience levels
   useEffect(() => {
     if (!svgRef.current || isLoading || !data) return;
@@ -823,9 +839,110 @@ export default function JobPostingsTimeLine({
   return (
     <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-lg shadow overflow-hidden border border-gray-700 h-full flex flex-col">
       <div className="p-2 border-b border-gray-700 flex items-center justify-between">
-        <h3 className="text-sm font-semibold bg-gradient-to-r from-cyan-400 to-blue-500 text-transparent bg-clip-text">
-          Job Posting Trends
-        </h3>
+        <div className="flex items-center">
+          <h3 className="text-sm font-semibold bg-gradient-to-r from-cyan-400 to-blue-500 text-transparent bg-clip-text">
+            Job Posting Trends
+          </h3>
+          <div className="relative ml-2">
+            <Button 
+              size="sm" 
+              variant="outline" 
+              className="h-6 px-2 py-0 text-xs border-blue-600/40 bg-blue-950/30 hover:bg-blue-900/40"
+              onClick={() => setIsFilterMenuOpen(!isFilterMenuOpen)}
+            >
+              <span className="flex items-center gap-1">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
+                </svg>
+                Filters
+                {filters.experienceLevels.length > 0 && (
+                  <span className="inline-flex items-center justify-center w-4 h-4 text-xs font-bold text-white bg-blue-600 rounded-full">
+                    {filters.experienceLevels.length}
+                  </span>
+                )}
+              </span>
+            </Button>
+            
+            {isFilterMenuOpen && (
+              <div 
+                ref={filterMenuRef}
+                className="absolute top-full left-0 mt-1 w-52 bg-gray-900 border border-blue-900/60 rounded-md shadow-lg z-20 p-2"
+              >
+                <div className="mb-2 pb-1 border-b border-gray-800 flex justify-between items-center">
+                  <span className="text-xs font-medium text-gray-400">Experience Levels</span>
+                  <div className="flex gap-1">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-5 px-1.5 py-0 text-[10px] text-blue-400 hover:text-white hover:bg-blue-900/30"
+                      onClick={() => {
+                        // Select all experience levels
+                        const newFilters = { 
+                          ...filters, 
+                          experienceLevels: [...data.experienceLevels] 
+                        };
+                        setFilters(newFilters);
+                      }}
+                    >
+                      Select All
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-5 px-1.5 py-0 text-[10px] text-gray-400 hover:text-white"
+                      onClick={() => {
+                        // Clear all experience level filters
+                        const newFilters = { ...filters, experienceLevels: [] };
+                        setFilters(newFilters);
+                      }}
+                    >
+                      Clear
+                    </Button>
+                  </div>
+                </div>
+                <div className="max-h-56 overflow-y-auto pr-1 filter-dropdown-menu">
+                  {data.experienceLevels.map((level) => {
+                    const isSelected = filters.experienceLevels.includes(level);
+                    return (
+                      <div 
+                        key={level}
+                        className={`flex items-center py-1 px-2 rounded-sm mb-1 cursor-pointer hover:bg-blue-900/20 ${
+                          isSelected ? 'bg-blue-900/30 text-blue-300' : 'text-gray-300'
+                        }`}
+                        onClick={() => {
+                          const newFilters = { ...filters };
+                          if (isSelected) {
+                            // Remove from filters
+                            newFilters.experienceLevels = newFilters.experienceLevels.filter(
+                              (l) => l !== level
+                            );
+                          } else {
+                            // Add to filters
+                            newFilters.experienceLevels = [...newFilters.experienceLevels, level];
+                          }
+                          setFilters(newFilters);
+                        }}
+                      >
+                        <div className={`w-3.5 h-3.5 mr-2 rounded-sm border ${
+                          isSelected 
+                            ? 'bg-blue-500 border-blue-500' 
+                            : 'border-gray-600'
+                        }`}>
+                          {isSelected && (
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="white">
+                              <path d="M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0Z" />
+                            </svg>
+                          )}
+                        </div>
+                        <span className="text-xs">{level}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
         <div className="flex items-center gap-1">
           <Button
             size="sm"

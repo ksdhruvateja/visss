@@ -32,6 +32,44 @@
   opacity: 0.3;
 }
 
+/* Filter dropdown styles */
+.filter-dropdown-enter {
+  opacity: 0;
+  transform: scale(0.95);
+}
+
+.filter-dropdown-enter-active {
+  opacity: 1;
+  transform: scale(1);
+  transition: opacity 100ms ease-out, transform 100ms ease-out;
+}
+
+.filter-dropdown-exit {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.filter-dropdown-exit-active {
+  opacity: 0;
+  transform: scale(0.95);
+  transition: opacity 75ms ease-in, transform 75ms ease-in;
+}
+
+/* Custom scrollbar for filter menu */
+.filter-dropdown-menu::-webkit-scrollbar {
+  width: 6px;
+}
+
+.filter-dropdown-menu::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.3);
+  border-radius: 4px;
+}
+
+.filter-dropdown-menu::-webkit-scrollbar-thumb {
+  background-color: rgba(59, 130, 246, 0.5);
+  border-radius: 4px;
+}
+
 :root {
       --background: 0 0% 100%;
 --foreground: 20 14.3% 4.1%;

@@ -27,33 +27,33 @@ export default function FilterControls({ onFilterChange, locations, isLoading = 
 
   // Apply filters when component mounts with empty filters
   useEffect(() => {
-    // Only run once when the component mounts
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    onFilterChange(filters);
+  }, [onFilterChange]);
 
   const handleFilterChange = <K extends keyof FilterOptions>(key: K, value: string, checked: boolean) => {
-    const updatedFilters = { ...filters };
-    const currentValues = [...updatedFilters[key]];
-    
-    if (checked) {
-      // Add value if not already in array
-      if (!currentValues.includes(value)) {
-        currentValues.push(value);
+    setFilters(prev => {
+      const currentValues = [...prev[key]];
+      
+      if (checked) {
+        // Add value if not already in array
+        if (!currentValues.includes(value)) {
+          currentValues.push(value);
+        }
+      } else {
+        // Remove value if in array
+        const index = currentValues.indexOf(value);
+        if (index !== -1) {
+          currentValues.splice(index, 1);
+        }
       }
-    } else {
-      // Remove value if in array
-      const index = currentValues.indexOf(value);
-      if (index !== -1) {
-        currentValues.splice(index, 1);
-      }
-    }
-    
-    updatedFilters[key] = currentValues;
-    setFilters(updatedFilters);
-    onFilterChange(updatedFilters);
+      
+      return { ...prev, [key]: currentValues };
+    });
   };
 
-  // No longer needed as we're applying filters immediately
+  const handleApplyFilters = () => {
+    onFilterChange(filters);
+  };
 
   const handleClearFilters = () => {
     const emptyFilters = {
@@ -67,10 +67,10 @@ export default function FilterControls({ onFilterChange, locations, isLoading = 
   };
 
   const removeFilter = (key: keyof FilterOptions, value: string) => {
-    const updatedFilters = { ...filters };
-    updatedFilters[key] = filters[key].filter(v => v !== value);
-    setFilters(updatedFilters);
-    onFilterChange(updatedFilters);
+    setFilters(prev => {
+      const newValues = prev[key].filter(v => v !== value);
+      return { ...prev, [key]: newValues };
+    });
   };
 
   const experienceLevelOptions = [
@@ -274,7 +274,7 @@ export default function FilterControls({ onFilterChange, locations, isLoading = 
             </Popover>
           </div>
 
-          {/* Clear Button Only */}
+          {/* Action Buttons */}
           <div className="flex gap-1 ml-auto">
             <Button
               disabled={isLoading}
@@ -283,7 +283,15 @@ export default function FilterControls({ onFilterChange, locations, isLoading = 
               onClick={handleClearFilters}
               className="h-6 px-2 py-0 text-xs border-gray-700 text-gray-400 hover:bg-gray-700 hover:text-white"
             >
-              Clear All
+              Clear
+            </Button>
+            <Button
+              disabled={isLoading}
+              size="sm"
+              onClick={handleApplyFilters}
+              className="h-6 px-2 py-0 text-xs bg-gradient-to-r from-cyan-500 to-blue-600 hover:opacity-90 text-white"
+            >
+              Apply
             </Button>
           </div>
         </div>

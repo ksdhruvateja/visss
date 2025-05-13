@@ -104,13 +104,9 @@ export default function SalaryLocationIndustryBarChart({ data, isLoading }: Sala
       .append('g')
       .attr('transform', `translate(${margin.left},${margin.top})`);
 
-    // Don't filter industries - we'll show all of them but with different styling
+    // Filter the data to only include active industries
     const filteredLocations = data.locations.slice(0, 10); // Limit to top 10 locations for readability
-    
-    // Use all industries for domain to maintain consistent bar positions
-    // This is crucial - we want to keep showing all industries but highlight the active ones
-    const allIndustries = data.industries;
-    
+
     // Create the X scale
     const x0 = d3.scaleBand()
       .domain(filteredLocations)
@@ -118,14 +114,14 @@ export default function SalaryLocationIndustryBarChart({ data, isLoading }: Sala
       .paddingInner(0.1);
 
     const x1 = d3.scaleBand()
-      .domain(allIndustries) // Use all industries, not just active ones
+      .domain(activeIndustries)
       .rangeRound([0, x0.bandwidth()])
       .padding(0.05);
 
-    // Find max salary for Y scale across ALL industries for stable scaling
+    // Find max salary for Y scale
     let maxSalary = 0;
     filteredLocations.forEach(location => {
-      allIndustries.forEach(industry => {
+      activeIndustries.forEach(industry => {
         if (data.data[location] && data.data[location][industry]) {
           maxSalary = Math.max(maxSalary, data.data[location][industry] || 0);
         }
@@ -166,23 +162,19 @@ export default function SalaryLocationIndustryBarChart({ data, isLoading }: Sala
     // Create tooltip
     const tooltip = d3.select(tooltipRef.current);
 
-    // Create the grouped bars for ALL industries
+    // Create the grouped bars
     filteredLocations.forEach(location => {
-      allIndustries.forEach(industry => {
+      activeIndustries.forEach(industry => {
         if (data.data[location] && data.data[location][industry]) {
-          const isActive = activeIndustries.includes(industry);
-          
           g.append('rect')
             .attr('x', x0(location)! + x1(industry)!)
             .attr('y', y(data.data[location][industry] || 0))
             .attr('width', x1.bandwidth())
             .attr('height', height - y(data.data[location][industry] || 0))
-            .attr('fill', getIndustryColor(industry, isActive))
+            .attr('fill', getIndustryColor(industry, true))
             .attr('rx', 2) // Rounded corners for futuristic look
             .attr('ry', 2)
-            .attr('opacity', isActive ? 1 : 0.3) // Fade out inactive industries
-            .style('filter', isActive ? 
-              'drop-shadow(0px 2px 3px rgba(0,0,0,0.2))' : 'none') // Subtle shadow for active only
+            .style('filter', 'drop-shadow(0px 2px 3px rgba(0,0,0,0.2))') // Subtle shadow
             .on('mouseover', function() {
               d3.select(this)
                 .attr('stroke', '#fff')
@@ -228,38 +220,18 @@ export default function SalaryLocationIndustryBarChart({ data, isLoading }: Sala
       });
     });
 
-    // Add legend with ALL industries, but style based on selection
+    // Add legend
     const legend = g.append('g')
       .attr('font-family', 'sans-serif')
       .attr('font-size', 10)
       .attr('text-anchor', 'start')
       .selectAll('g')
-      .data(allIndustries)
+      .data(activeIndustries)
       .enter().append('g')
       .attr('transform', (d, i) => `translate(${width + 10},${i * 20})`)
       .style('cursor', 'pointer')
       .on('click', (event, d) => {
-        // Use a directly simplified version to avoid any potential issues
-        const newActiveIndustries = activeIndustries.includes(d)
-          ? activeIndustries.filter(i => i !== d) // Remove if present
-          : [...activeIndustries, d]; // Add if not present
-        
-        setActiveIndustries(newActiveIndustries);
-        
-        // Also update global filters
-        if (filters.industries.includes(d)) {
-          // Remove if present
-          setFilters({
-            ...filters,
-            industries: filters.industries.filter(industry => industry !== d)
-          });
-        } else {
-          // Add if not present
-          setFilters({
-            ...filters,
-            industries: [...filters.industries, d]
-          });
-        }
+        toggleIndustry(d);
       });
 
     legend.append('rect')
@@ -268,15 +240,13 @@ export default function SalaryLocationIndustryBarChart({ data, isLoading }: Sala
       .attr('height', 15)
       .attr('rx', 2)
       .attr('ry', 2)
-      .attr('fill', d => getIndustryColor(d, activeIndustries.includes(d)))
-      .attr('opacity', d => activeIndustries.includes(d) ? 1 : 0.3);
+      .attr('fill', d => getIndustryColor(d, true));
 
     legend.append('text')
       .attr('x', 20)
       .attr('y', 7.5)
       .attr('dy', '0.32em')
-      .attr('fill', d => activeIndustries.includes(d) ? '#ffffff' : '#9ca3af')
-      .text(d => d + (activeIndustries.includes(d) ? ' ✓' : ''));
+      .text(d => d);
 
     // Add responsive resize handler
     const handleResize = () => {
@@ -289,30 +259,34 @@ export default function SalaryLocationIndustryBarChart({ data, isLoading }: Sala
   }, [data, isLoading, activeIndustries]);
 
   const toggleIndustry = (industry: string) => {
-    // Update local chart state - always toggle the clicked industry
-    const newActiveIndustries = activeIndustries.includes(industry)
-      ? activeIndustries.filter(i => i !== industry) // Remove if present
-      : [...activeIndustries, industry]; // Add if not present
-    
-    setActiveIndustries(newActiveIndustries);
-
-    // Update global filter context to match exactly
-    const newIndustryFilters = filters.industries.includes(industry)
-      ? filters.industries.filter(i => i !== industry) // Remove if present
-      : [...filters.industries, industry]; // Add if not present
-    
-    setFilters({
-      ...filters,
-      industries: newIndustryFilters
+    // Update local chart state
+    setActiveIndustries(prev => {
+      if (prev.includes(industry)) {
+        return prev.filter(i => i !== industry);
+      } else {
+        return [...prev, industry];
+      }
     });
 
-    // Update active item state for cross-chart highlighting
-    if (newActiveIndustries.includes(industry) && !activeIndustries.includes(industry)) {
-      // Highlight this industry when it's newly added
+    // Update global filter context
+    if (filters.industries.includes(industry)) {
+      // Remove industry from global filters
+      setFilters({
+        ...filters,
+        industries: filters.industries.filter(i => i !== industry)
+      });
+      // Clear active item if it's the same industry
+      if (activeItem.type === 'industry' && activeItem.value === industry) {
+        setActiveItem({ type: null, value: null });
+      }
+    } else {
+      // Add industry to global filters
+      setFilters({
+        ...filters,
+        industries: [...filters.industries, industry]
+      });
+      // Set as active item to highlight in other charts
       setActiveItem({ type: 'industry', value: industry });
-    } else if (activeItem.type === 'industry' && activeItem.value === industry) {
-      // Clear active item if it's the same industry being removed
-      setActiveItem({ type: null, value: null });
     }
   };
 
@@ -369,15 +343,7 @@ export default function SalaryLocationIndustryBarChart({ data, isLoading }: Sala
                 size="sm"
                 variant="ghost"
                 className="h-5 px-2 py-0 text-xs text-gray-400 hover:text-white"
-                onClick={() => {
-                  // Update local state
-                  setActiveIndustries(data.industries);
-                  // Update global filters to match
-                  setFilters({
-                    ...filters,
-                    industries: data.industries
-                  });
-                }}
+                onClick={() => setActiveIndustries(data.industries)}
               >
                 Select All
               </Button>
@@ -385,17 +351,7 @@ export default function SalaryLocationIndustryBarChart({ data, isLoading }: Sala
                 size="sm"
                 variant="ghost"
                 className="h-5 px-2 py-0 text-xs text-gray-400 hover:text-white"
-                onClick={() => {
-                  // Update local state
-                  setActiveIndustries([]);
-                  // Update global filters to match
-                  setFilters({
-                    ...filters,
-                    industries: []
-                  });
-                  // Clear active item
-                  setActiveItem({ type: null, value: null });
-                }}
+                onClick={() => setActiveIndustries([])}
               >
                 Clear
               </Button>
@@ -413,35 +369,16 @@ export default function SalaryLocationIndustryBarChart({ data, isLoading }: Sala
                 }`}
                 onClick={(e) => {
                   e.preventDefault();
-                  
-                  // Always handle as multi-select regardless of key modifiers
-                  // This allows for a more consistent UI behavior
-                  const newActiveIndustries = activeIndustries.includes(industry)
-                    ? activeIndustries.filter(i => i !== industry) // Remove if present
-                    : [...activeIndustries, industry]; // Add if not present
-                  
-                  setActiveIndustries(newActiveIndustries);
-                  
-                  // Update global filters to match exactly
-                  if (filters.industries.includes(industry)) {
-                    // Remove if present
-                    setFilters({
-                      ...filters,
-                      industries: filters.industries.filter(industry2 => industry2 !== industry)
-                    });
+                  if (e.shiftKey || e.ctrlKey || e.metaKey) {
+                    // Toggle single industry
+                    toggleIndustry(industry);
                   } else {
-                    // Add if not present
-                    setFilters({
-                      ...filters,
-                      industries: [...filters.industries, industry]
-                    });
-                  }
-                  
-                  // Update the active item state for cross-chart highlighting
-                  if (newActiveIndustries.includes(industry) && !activeIndustries.includes(industry)) {
-                    setActiveItem({ type: 'industry', value: industry });
-                  } else if (activeItem.type === 'industry' && activeItem.value === industry) {
-                    setActiveItem({ type: null, value: null });
+                    // Set as single selection if not already selected
+                    if (activeIndustries.length === 1 && activeIndustries[0] === industry) {
+                      setActiveIndustries([]);
+                    } else {
+                      setActiveIndustries([industry]);
+                    }
                   }
                 }}
               >

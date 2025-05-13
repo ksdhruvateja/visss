@@ -1,12 +1,10 @@
-import { useRef, useEffect, useState, useCallback } from 'react';
+import { useRef, useEffect, useState } from 'react';
 import * as d3 from 'd3';
 import { RidgelineData } from '@/types';
 import { formatCurrency } from "@/lib/utils/data";
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { useFilterContext } from '@/contexts/FilterContext';
-import { Badge } from '@/components/ui/badge';
-import { LucideArrowLeftRight, LucideZoomIn, LucidePlus, LucideMinus, LucideMaximize, LucideArrowUpDown } from 'lucide-react';
 
 interface SalaryJobTitleRidgelineProps {
   data: RidgelineData | undefined;
@@ -22,23 +20,6 @@ export default function SalaryJobTitleRidgeline({ data, isLoading }: SalaryJobTi
   const [sortBy, setSortBy] = useState<'alphabetical' | 'median' | 'range'>('median');
   const { filters, setFilters, activeItem, setActiveItem } = useFilterContext();
   
-  // New state variables for enhanced functionality
-  const [zoomMode, setZoomMode] = useState(false);
-  const [zoomedJob, setZoomedJob] = useState<string | null>(null);
-  const [comparingJobs, setComparingJobs] = useState<string[]>([]);
-  const [percentileView, setPercentileView] = useState(false);
-  const [salarySummary, setSalarySummary] = useState<{
-    min: number;
-    max: number;
-    median: number;
-    mean: number;
-    p25: number;
-    p75: number;
-    p90: number;
-    count: number;
-    job: string;
-  } | null>(null);
-  
   // Formatting utilities 
   const formatSalary = (value: number): string => {
     return Math.round(value).toLocaleString('en-US');
@@ -52,55 +33,6 @@ export default function SalaryJobTitleRidgeline({ data, isLoading }: SalaryJobTi
       maximumFractionDigits: 0
     }).format(value);
   };
-  
-  // Helper function to calculate and update salary statistics for a job
-  const calculateSalaryStats = useCallback((jobTitle: string) => {
-    if (!data || !data.salaryRanges || !data.salaryRanges[jobTitle]) {
-      setSalarySummary(null);
-      return;
-    }
-    
-    const values = data.salaryRanges[jobTitle].values;
-    if (!values || values.length === 0) {
-      setSalarySummary(null);
-      return;
-    }
-    
-    // Sort values for percentile calculations
-    const sortedValues = [...values].sort((a, b) => a - b);
-    
-    // Calculate statistics
-    const min = sortedValues[0];
-    const max = sortedValues[sortedValues.length - 1];
-    const median = d3.median(sortedValues) || min;
-    const mean = d3.mean(sortedValues) || min;
-    
-    // Calculate percentiles
-    const p25 = sortedValues.length > 1 
-      ? d3.quantile(sortedValues, 0.25) || min
-      : min;
-    
-    const p75 = sortedValues.length > 1 
-      ? d3.quantile(sortedValues, 0.75) || max
-      : max;
-      
-    const p90 = sortedValues.length > 1 
-      ? d3.quantile(sortedValues, 0.9) || max
-      : max;
-    
-    // Update state with calculated statistics
-    setSalarySummary({
-      min,
-      max,
-      median,
-      mean,
-      p25,
-      p75,
-      p90,
-      count: values.length,
-      job: jobTitle
-    });
-  }, [data]);
   
   // Effect to highlight elements based on active items from other charts
   useEffect(() => {
@@ -211,25 +143,8 @@ export default function SalaryJobTitleRidgeline({ data, isLoading }: SalaryJobTi
       return;
     }
 
-    // Handle zoom mode - only show the zoomed job if in zoom mode
-    if (zoomMode && zoomedJob) {
-      // Find the job data and display only that one
-      const zoomedJobData = displayJobTitles.find(job => job.title === zoomedJob);
-      if (zoomedJobData) {
-        // Calculate statistics for the zoomed job
-        calculateSalaryStats(zoomedJob);
-        // Return an array with just this job 
-        displayJobTitles = [zoomedJobData];
-      }
-    }
-    // Handle comparison mode - only show selected jobs for comparison
-    else if (comparingJobs.length > 0) {
-      // Filter to only show jobs in the comparison list
-      displayJobTitles = displayJobTitles.filter(job => comparingJobs.includes(job.title));
-    }
-    
     // Select job titles to display (top 5 if showTopTitles is true, or max 15 for "All")
-    let displayedTitles = showTopTitles && !zoomMode && comparingJobs.length === 0
+    const displayedTitles = showTopTitles
       ? displayJobTitles.slice(0, Math.min(5, displayJobTitles.length)) // Top 5 highest paying positions
       : displayJobTitles.slice(0, Math.min(15, displayJobTitles.length)); // Cap at 15 titles for readability
 
@@ -399,61 +314,6 @@ export default function SalaryJobTitleRidgeline({ data, isLoading }: SalaryJobTi
         .attr('stroke-width', 4)
         .attr('opacity', 0.2)
         .style('filter', 'blur(4px)');
-      
-      // Add percentile lines when percentile view is enabled
-      if (percentileView) {
-        // Calculate additional percentiles for each job - 10th and 90th
-        jobGroups.each(function(d: any) {
-          if (!d.values || d.values.length <= 1) return;
-          
-          const sortedValues = [...d.values].sort((a: number, b: number) => a - b);
-          const p10 = d3.quantile(sortedValues, 0.1) || d.min;
-          const p90 = d3.quantile(sortedValues, 0.9) || d.max;
-          
-          // Add 10th percentile line (P10)
-          d3.select(this)
-            .append('line')
-            .attr('x1', x(p10))
-            .attr('x2', x(p10))
-            .attr('y1', y.bandwidth() * 0.25)
-            .attr('y2', y.bandwidth() * 0.75)
-            .attr('stroke', '#94a3b8')
-            .attr('stroke-width', 1.5)
-            .attr('stroke-dasharray', '2,2');
-          
-          // Add 90th percentile line (P90)
-          d3.select(this)
-            .append('line')
-            .attr('x1', x(p90))
-            .attr('x2', x(p90))
-            .attr('y1', y.bandwidth() * 0.25)
-            .attr('y2', y.bandwidth() * 0.75)
-            .attr('stroke', '#94a3b8')
-            .attr('stroke-width', 1.5)
-            .attr('stroke-dasharray', '2,2');
-          
-          // Add small labels for p10 and p90
-          if (zoomMode) {
-            d3.select(this)
-              .append('text')
-              .attr('x', x(p10))
-              .attr('y', y.bandwidth() * 0.15)
-              .attr('text-anchor', 'middle')
-              .attr('font-size', '8px')
-              .attr('fill', '#94a3b8')
-              .text('P10');
-              
-            d3.select(this)
-              .append('text')
-              .attr('x', x(p90))
-              .attr('y', y.bandwidth() * 0.15)
-              .attr('text-anchor', 'middle')
-              .attr('font-size', '8px')
-              .attr('fill', '#94a3b8')
-              .text('P90');
-          }
-        });
-      }
     }
     
     else if (visualizationStyle === 'density') {
@@ -654,40 +514,9 @@ export default function SalaryJobTitleRidgeline({ data, isLoading }: SalaryJobTi
         }
       })
       .on('click', function(event, d) {
-        const jobTitle = d.title;
-        
-        // Calculate statistics for this job
-        calculateSalaryStats(jobTitle);
-        
-        // If in comparison mode, handle adding/removing from comparison
-        if (comparingJobs.length > 0) {
-          // Toggle this job in/out of comparison
-          if (comparingJobs.includes(jobTitle)) {
-            setComparingJobs(comparingJobs.filter(job => job !== jobTitle));
-          } else if (comparingJobs.length < 3) { // Limit to comparing 3 jobs max
-            setComparingJobs([...comparingJobs, jobTitle]);
-          }
-          setRedrawTrigger(prev => prev + 1);
-          return;
-        }
-        
-        // If in zoom mode and this is the zoomed job, exit zoom mode
-        if (zoomMode && zoomedJob === jobTitle) {
-          setZoomMode(false);
-          setZoomedJob(null);
-          setRedrawTrigger(prev => prev + 1);
-          return;
-        }
-        
-        // If in zoom mode but this isn't the zoomed job, change zoomed job
-        if (zoomMode && zoomedJob !== jobTitle) {
-          setZoomedJob(jobTitle);
-          setRedrawTrigger(prev => prev + 1);
-          return;
-        }
-        
-        // Regular filtering behavior (when not in special modes)
+        // Update global filters
         const newFilters = { ...filters };
+        const jobTitle = d.title;
         
         if (filters.industries.includes(jobTitle)) {
           // If this job title is already selected, remove it
@@ -714,19 +543,7 @@ export default function SalaryJobTitleRidgeline({ data, isLoading }: SalaryJobTi
             <div class="text-white">Q1-Q3: ${formatCurrency(d.q1)} - ${formatCurrency(d.q3)}</div>
             <div class="text-white">Range: ${formatCurrency(d.min)} - ${formatCurrency(d.max)}</div>
             <div class="mt-1 text-xs text-slate-200">Based on ${d.count} job postings</div>
-            ${zoomMode ? 
-              `<div class="text-xs mt-1 ${zoomedJob === d.title ? 'text-amber-400' : 'text-blue-400'}">${zoomedJob === d.title ? '⊕ Currently zoomed' : 'Click to zoom'}</div>` : 
-              comparingJobs.length > 0 ? 
-                `<div class="text-xs mt-1 ${comparingJobs.includes(d.title) ? 'text-green-400' : 'text-blue-300'}">${comparingJobs.includes(d.title) ? '✓ In comparison' : 'Add to comparison'}</div>` :
-                `<div class="text-xs mt-1 ${filters.industries.includes(d.title) ? 'text-green-400' : 'text-blue-300'}">${filters.industries.includes(d.title) ? '✓ Added to filters' : 'Click to add to filters'}</div>`
-            }
-            ${(zoomMode || comparingJobs.length > 0) ? 
-              `<div class="text-xs mt-1 text-slate-400">
-                ${zoomMode ? 'Click zoomed job to exit zoom mode' : ''}
-                ${comparingJobs.length > 0 ? `Comparing ${comparingJobs.length}/3 jobs` : ''}
-              </div>` : 
-              ''
-            }
+            <div class="text-xs italic mt-1 text-green-400">✓ Added to filters</div>
           `);
         
         // Apply a persistent highlight to the selected bar
@@ -798,19 +615,7 @@ export default function SalaryJobTitleRidgeline({ data, isLoading }: SalaryJobTi
 
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
-  }, [
-    data, 
-    isLoading, 
-    showTopTitles, 
-    redrawTrigger, 
-    visualizationStyle, 
-    zoomMode, 
-    zoomedJob, 
-    comparingJobs, 
-    percentileView,
-    calculateSalaryStats,
-    sortBy
-  ]);
+  }, [data, isLoading, showTopTitles, redrawTrigger]);
 
   if (isLoading) {
     return (
@@ -891,228 +696,106 @@ export default function SalaryJobTitleRidgeline({ data, isLoading }: SalaryJobTi
         </div>
         
         <div className="flex flex-wrap gap-1 justify-between">
-          {/* Interactive Feature Controls */}
-          <div className="flex items-center space-x-1 rounded overflow-hidden border border-indigo-800/60">
+          {/* Visualization Style Controls */}
+          <div className="flex items-center space-x-1 rounded overflow-hidden border border-purple-800/60">
             <Button
               size="sm"
-              variant={zoomMode ? "secondary" : "ghost"}
-              className={`h-6 px-2 py-0 text-xs rounded-none flex items-center gap-1 ${
-                zoomMode 
-                  ? 'bg-indigo-900/70 text-indigo-100 hover:bg-indigo-900/90' 
+              variant={visualizationStyle === 'boxplot' ? "secondary" : "ghost"}
+              className={`h-6 px-2 py-0 text-xs rounded-none ${
+                visualizationStyle === 'boxplot' 
+                  ? 'bg-purple-900/70 text-purple-100 hover:bg-purple-900/90' 
                   : 'text-gray-400 hover:bg-gray-800'
               }`}
               onClick={() => {
-                // Toggle zoom mode
-                if (zoomMode) {
-                  setZoomMode(false);
-                  setZoomedJob(null);
-                } else {
-                  setZoomMode(true);
-                  setComparingJobs([]);
-                }
+                setVisualizationStyle('boxplot');
                 setRedrawTrigger(prev => prev + 1);
               }}
             >
-              <LucideZoomIn className="w-3 h-3" />
-              {zoomMode ? 'Exit Zoom' : 'Zoom'}
+              Box Plot
             </Button>
             <Button
               size="sm"
-              variant={comparingJobs.length > 0 ? "secondary" : "ghost"}
-              className={`h-6 px-2 py-0 text-xs rounded-none flex items-center gap-1 ${
-                comparingJobs.length > 0
-                  ? 'bg-indigo-900/70 text-indigo-100 hover:bg-indigo-900/90' 
+              variant={visualizationStyle === 'density' ? "secondary" : "ghost"}
+              className={`h-6 px-2 py-0 text-xs rounded-none ${
+                visualizationStyle === 'density' 
+                  ? 'bg-purple-900/70 text-purple-100 hover:bg-purple-900/90' 
                   : 'text-gray-400 hover:bg-gray-800'
               }`}
               onClick={() => {
-                // Toggle comparison mode
-                if (comparingJobs.length > 0) {
-                  setComparingJobs([]);
-                } else {
-                  setZoomMode(false);
-                  setZoomedJob(null);
-                  setComparingJobs([]);
-                }
+                setVisualizationStyle('density');
                 setRedrawTrigger(prev => prev + 1);
               }}
             >
-              <LucideArrowLeftRight className="w-3 h-3" />
-              {comparingJobs.length > 0 ? `Compare (${comparingJobs.length})` : 'Compare'}
+              Density
             </Button>
             <Button
               size="sm"
-              variant={percentileView ? "secondary" : "ghost"}
-              className={`h-6 px-2 py-0 text-xs rounded-none flex items-center gap-1 ${
-                percentileView
-                  ? 'bg-indigo-900/70 text-indigo-100 hover:bg-indigo-900/90' 
+              variant={visualizationStyle === 'bars' ? "secondary" : "ghost"}
+              className={`h-6 px-2 py-0 text-xs rounded-none ${
+                visualizationStyle === 'bars' 
+                  ? 'bg-purple-900/70 text-purple-100 hover:bg-purple-900/90' 
                   : 'text-gray-400 hover:bg-gray-800'
               }`}
               onClick={() => {
-                setPercentileView(!percentileView);
+                setVisualizationStyle('bars');
                 setRedrawTrigger(prev => prev + 1);
               }}
             >
-              <LucideArrowUpDown className="w-3 h-3" />
-              Percentiles
+              Bar Chart
             </Button>
           </div>
           
-          <div className="flex flex-wrap gap-1 justify-between mt-1">
-            {/* Visualization Style Controls */}
-            <div className="flex items-center space-x-1 rounded overflow-hidden border border-purple-800/60">
-              <Button
-                size="sm"
-                variant={visualizationStyle === 'boxplot' ? "secondary" : "ghost"}
-                className={`h-6 px-2 py-0 text-xs rounded-none ${
-                  visualizationStyle === 'boxplot' 
-                    ? 'bg-purple-900/70 text-purple-100 hover:bg-purple-900/90' 
-                    : 'text-gray-400 hover:bg-gray-800'
-                }`}
-                onClick={() => {
-                  setVisualizationStyle('boxplot');
-                  setRedrawTrigger(prev => prev + 1);
-                }}
-              >
-                Box Plot
-              </Button>
-              <Button
-                size="sm"
-                variant={visualizationStyle === 'density' ? "secondary" : "ghost"}
-                className={`h-6 px-2 py-0 text-xs rounded-none ${
-                  visualizationStyle === 'density' 
-                    ? 'bg-purple-900/70 text-purple-100 hover:bg-purple-900/90' 
-                    : 'text-gray-400 hover:bg-gray-800'
-                }`}
-                onClick={() => {
-                  setVisualizationStyle('density');
-                  setRedrawTrigger(prev => prev + 1);
-                }}
-              >
-                Density
-              </Button>
-              <Button
-                size="sm"
-                variant={visualizationStyle === 'bars' ? "secondary" : "ghost"}
-                className={`h-6 px-2 py-0 text-xs rounded-none ${
-                  visualizationStyle === 'bars' 
-                    ? 'bg-purple-900/70 text-purple-100 hover:bg-purple-900/90' 
-                    : 'text-gray-400 hover:bg-gray-800'
-                }`}
-                onClick={() => {
-                  setVisualizationStyle('bars');
-                  setRedrawTrigger(prev => prev + 1);
-                }}
-              >
-                Bar Chart
-              </Button>
-            </div>
-            
-            {/* Sorting Controls */}
-            <div className="flex items-center space-x-1 rounded overflow-hidden border border-cyan-800/60">
-              <Button
-                size="sm"
-                variant={sortBy === 'median' ? "secondary" : "ghost"}
-                className={`h-6 px-2 py-0 text-xs rounded-none ${
-                  sortBy === 'median' 
-                    ? 'bg-cyan-900/70 text-cyan-100 hover:bg-cyan-900/90' 
-                    : 'text-gray-400 hover:bg-gray-800'
-                }`}
-                onClick={() => {
-                  setSortBy('median');
-                  setRedrawTrigger(prev => prev + 1);
-                }}
-              >
-                By Median
-              </Button>
-              <Button
-                size="sm"
-                variant={sortBy === 'range' ? "secondary" : "ghost"}
-                className={`h-6 px-2 py-0 text-xs rounded-none ${
-                  sortBy === 'range' 
-                    ? 'bg-cyan-900/70 text-cyan-100 hover:bg-cyan-900/90' 
-                    : 'text-gray-400 hover:bg-gray-800'
-                }`}
-                onClick={() => {
-                  setSortBy('range');
-                  setRedrawTrigger(prev => prev + 1);
-                }}
-              >
-                By Range
-              </Button>
-              <Button
-                size="sm"
-                variant={sortBy === 'alphabetical' ? "secondary" : "ghost"}
-                className={`h-6 px-2 py-0 text-xs rounded-none ${
-                  sortBy === 'alphabetical' 
-                    ? 'bg-cyan-900/70 text-cyan-100 hover:bg-cyan-900/90' 
-                    : 'text-gray-400 hover:bg-gray-800'
-                }`}
-                onClick={() => {
-                  setSortBy('alphabetical');
-                  setRedrawTrigger(prev => prev + 1);
-                }}
-              >
-                A-Z
-              </Button>
-            </div>
+          {/* Sorting Controls */}
+          <div className="flex items-center space-x-1 rounded overflow-hidden border border-cyan-800/60">
+            <Button
+              size="sm"
+              variant={sortBy === 'median' ? "secondary" : "ghost"}
+              className={`h-6 px-2 py-0 text-xs rounded-none ${
+                sortBy === 'median' 
+                  ? 'bg-cyan-900/70 text-cyan-100 hover:bg-cyan-900/90' 
+                  : 'text-gray-400 hover:bg-gray-800'
+              }`}
+              onClick={() => {
+                setSortBy('median');
+                setRedrawTrigger(prev => prev + 1);
+              }}
+            >
+              By Median
+            </Button>
+            <Button
+              size="sm"
+              variant={sortBy === 'range' ? "secondary" : "ghost"}
+              className={`h-6 px-2 py-0 text-xs rounded-none ${
+                sortBy === 'range' 
+                  ? 'bg-cyan-900/70 text-cyan-100 hover:bg-cyan-900/90' 
+                  : 'text-gray-400 hover:bg-gray-800'
+              }`}
+              onClick={() => {
+                setSortBy('range');
+                setRedrawTrigger(prev => prev + 1);
+              }}
+            >
+              By Range
+            </Button>
+            <Button
+              size="sm"
+              variant={sortBy === 'alphabetical' ? "secondary" : "ghost"}
+              className={`h-6 px-2 py-0 text-xs rounded-none ${
+                sortBy === 'alphabetical' 
+                  ? 'bg-cyan-900/70 text-cyan-100 hover:bg-cyan-900/90' 
+                  : 'text-gray-400 hover:bg-gray-800'
+              }`}
+              onClick={() => {
+                setSortBy('alphabetical');
+                setRedrawTrigger(prev => prev + 1);
+              }}
+            >
+              A-Z
+            </Button>
           </div>
         </div>
       </div>
       <div className="p-2 flex-grow flex flex-col">
-        {/* Detailed stats panel for zoomed or selected job */}
-        {salarySummary && (zoomMode || percentileView) && (
-          <div className="bg-gray-900/60 rounded p-2 mb-2 border-t border-indigo-900/40 flex items-center justify-between text-xs">
-            <div>
-              <span className="text-indigo-300 font-medium mr-2">{salarySummary.job}</span>
-              <span className="text-white">{formatCurrency(salarySummary.median)} median</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Badge variant="outline" className="text-[10px] py-0 h-5 bg-gray-800/50 hover:bg-gray-800/90 border-gray-700">
-                P10: {formatCurrency(salarySummary.min)}
-              </Badge>
-              <Badge variant="outline" className="text-[10px] py-0 h-5 bg-gray-800/50 hover:bg-gray-800/90 border-indigo-700">
-                P25: {formatCurrency(salarySummary.p25)}
-              </Badge>
-              <Badge variant="outline" className="text-[10px] py-0 h-5 bg-gray-800/50 hover:bg-gray-800/90 border-purple-700">
-                P75: {formatCurrency(salarySummary.p75)}
-              </Badge>
-              <Badge variant="outline" className="text-[10px] py-0 h-5 bg-gray-800/50 hover:bg-gray-800/90 border-cyan-700">
-                P90: {formatCurrency(salarySummary.p90)}
-              </Badge>
-              <Badge className="text-[10px] py-0 h-5 bg-indigo-900/50 hover:bg-indigo-900/80">
-                n={salarySummary.count}
-              </Badge>
-            </div>
-          </div>
-        )}
-        
-        {/* Comparing jobs panel */}
-        {comparingJobs.length > 0 && (
-          <div className="bg-gray-900/60 rounded p-2 mb-2 border-t border-indigo-900/40 flex flex-wrap gap-2 text-xs">
-            {comparingJobs.map(job => (
-              <div key={job} className="flex flex-col bg-gray-800/70 rounded p-1 border border-gray-700">
-                <span className="text-white font-medium">{job}</span>
-                <div className="flex items-center gap-1 mt-1">
-                  <span className="text-cyan-400">{formatCurrency(data?.salaryRanges[job]?.values[0] || 0)}</span>
-                  <span className="text-gray-400">→</span> 
-                  <span className="text-purple-400">{formatCurrency(data?.salaryRanges[job]?.values[1] || 0)}</span>
-                </div>
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  className="text-[10px] h-5 mt-1 text-gray-400 hover:text-white hover:bg-indigo-900/50"
-                  onClick={() => {
-                    setComparingJobs(comparingJobs.filter(j => j !== job));
-                    setRedrawTrigger(prev => prev + 1);
-                  }}
-                >
-                  Remove
-                </Button>
-              </div>
-            ))}
-          </div>
-        )}
-        
         <div className="relative flex-grow">
           <svg 
             ref={svgRef} 

@@ -26,7 +26,10 @@ export default function JobPostingsTimeLine({
   >([]);
   const [brushExtent, setBrushExtent] = useState<[Date, Date] | null>(null);
   const [redrawTrigger, setRedrawTrigger] = useState(0);
-  const [selectedLevels, setSelectedLevels] = useState<string[]>([]);
+  const [isFilterMenuOpen, setIsFilterMenuOpen] = useState(false);
+  const [filterTab, setFilterTab] = useState<'experience' | 'employment'>('experience');
+  const [employmentTypes, setEmploymentTypes] = useState<string[]>([]);
+  const filterMenuRef = useRef<HTMLDivElement | null>(null);
   const { filters, setFilters, activeItem, setActiveItem } = useFilterContext();
 
   // Set visible experience levels when data changes
@@ -40,8 +43,6 @@ export default function JobPostingsTimeLine({
       setVisibleExperienceLevels(data.experienceLevels);
     }
   }, [data, isLoading]);
-  
-
 
   // Create a custom effect to ensure data points are interactive when zoomed in
   useEffect(() => {
@@ -518,58 +519,62 @@ export default function JobPostingsTimeLine({
           tooltip.style("opacity", 0);
         })
         .on("click", function (event, d) {
-          event.preventDefault();
-          event.stopPropagation();
-          
-          // Get the experience level for this point
-          const experienceLevel = d.level;
-          
-          // Check if this level is already in our selected levels
-          const isAlreadySelected = selectedLevels.includes(experienceLevel);
-          
-          // Toggle selection state for this level
-          if (isAlreadySelected) {
-            // If it's the only selected level, clear selection
-            if (selectedLevels.length === 1) {
-              setSelectedLevels([]);
-            } else {
-              // Otherwise remove this level from selection
-              setSelectedLevels(selectedLevels.filter(level => level !== experienceLevel));
-            }
-          } else {
-            // Add this level to our selections
-            setSelectedLevels([...selectedLevels, experienceLevel]);
-          }
-          
-          // Update the active item to highlight in filter context
-          setActiveItem({ type: "experienceLevel", value: experienceLevel });
-          
-          // Update visual indication of selection
-          const newSelected = !isAlreadySelected;
+          // Toggle selected class
+          const isSelected = d3.select(this).classed("selected");
+          d3.select(this).classed("selected", !isSelected);
+
+          // Mark this level as selected
           d3.select(this)
-            .classed("selected", newSelected)
-            .attr("stroke", newSelected ? "#fff" : "#2d3748")
-            .attr("stroke-width", newSelected ? 2 : 1.5);
+            .attr("stroke", !isSelected ? "#fff" : "#2d3748")
+            .attr("stroke-width", !isSelected ? 2 : 1.5);
+
+          // Update global filters
+          const newFilters = { ...filters };
+          const experienceLevel = d.level;
+
+          // Toggle experience level in filters
+          if (newFilters.experienceLevels.includes(experienceLevel)) {
+            // Remove this experience level
+            newFilters.experienceLevels = newFilters.experienceLevels.filter(
+              (e) => e !== experienceLevel,
+            );
+          } else {
+            // Add this experience level
+            newFilters.experienceLevels = [
+              ...newFilters.experienceLevels,
+              experienceLevel,
+            ];
+          }
+          setFilters(newFilters);
+
+          // Update visible levels for the chart
+          const isCurrentlyVisible =
+            visibleExperienceLevels.includes(experienceLevel);
+          if (isCurrentlyVisible && visibleExperienceLevels.length > 1) {
+            setVisibleExperienceLevels(
+              visibleExperienceLevels.filter((l) => l !== experienceLevel),
+            );
+          } else if (!isCurrentlyVisible) {
+            setVisibleExperienceLevels([
+              ...visibleExperienceLevels,
+              experienceLevel,
+            ]);
+          }
 
           // Show updated tooltip with selection state
           tooltip.style("opacity", 1).html(`
               <div class="font-medium">${d.level}</div>
               <div>${format(parseDate(d.time), "MMMM yyyy")}</div>
               <div>Job Count: ${d.count}</div>
-              <div class="text-xs italic text-${newSelected ? "green" : "red"}-400">
-                ${newSelected ? "✓ Added to filters" : "✕ Removed from filters"}
+              <div class="text-xs italic text-${!isSelected ? "green" : "red"}-400">
+                ${!isSelected ? "✓ Added to filters" : "✕ Removed from filters"}
               </div>
             `);
 
-          // Position the tooltip near the data point
-          tooltip
-            .style("left", `${event.pageX + 10}px`)
-            .style("top", `${event.pageY - 20}px`);
-
-          // Keep tooltip visible for a longer moment
+          // Keep tooltip visible for a moment
           setTimeout(() => {
             tooltip.style("opacity", 0);
-          }, 2000);
+          }, 1500);
         });
     });
 
@@ -586,43 +591,37 @@ export default function JobPostingsTimeLine({
       .attr("transform", (d, i) => `translate(${width + 10},${i * 20})`)
       .style("cursor", "pointer")
       .on("click", function (event, d) {
-        event.preventDefault();
-        event.stopPropagation();
-        
-        // Get the experience level for this legend item
-        const experienceLevel = d;
-        
-        // Check if this level is already in our selected levels
-        const isAlreadySelected = selectedLevels.includes(experienceLevel);
-        
-        // Toggle selection state for this level
-        if (isAlreadySelected) {
-          // If it's the only selected level, clear selection
-          if (selectedLevels.length === 1) {
-            setSelectedLevels([]);
-          } else {
-            // Otherwise remove this level from selection
-            setSelectedLevels(selectedLevels.filter(level => level !== experienceLevel));
-          }
-        } else {
-          // Add this level to our selections
-          setSelectedLevels([...selectedLevels, experienceLevel]);
+        // Toggle visibility of experience level
+        const isCurrentlyVisible = visibleExperienceLevels.includes(d);
+        if (isCurrentlyVisible && visibleExperienceLevels.length > 1) {
+          setVisibleExperienceLevels(
+            visibleExperienceLevels.filter((l) => l !== d),
+          );
+        } else if (!isCurrentlyVisible) {
+          setVisibleExperienceLevels([...visibleExperienceLevels, d]);
         }
-        
-        // Update the active item to highlight in filter context
+
+        // Update global filters
+        const newFilters = { ...filters };
+        const experienceLevel = d;
+
+        // Toggle experience level in filters
+        if (newFilters.experienceLevels.includes(experienceLevel)) {
+          // Remove this experience level
+          newFilters.experienceLevels = newFilters.experienceLevels.filter(
+            (e) => e !== experienceLevel,
+          );
+        } else {
+          // Add this experience level
+          newFilters.experienceLevels = [
+            ...newFilters.experienceLevels,
+            experienceLevel,
+          ];
+        }
+        setFilters(newFilters);
+
+        // Highlight active element in filter context
         setActiveItem({ type: "experienceLevel", value: experienceLevel });
-        
-        // Update highlighting for this legend item immediately
-        const newSelected = !isAlreadySelected;
-        const legendItem = d3.select(this);
-        
-        // Update rect opacity
-        legendItem.select("rect")
-          .attr("opacity", newSelected ? 1 : 0.3);
-        
-        // Update text opacity  
-        legendItem.select("text")
-          .style("opacity", newSelected ? 1 : 0.5);
       });
 
     legend
@@ -638,12 +637,7 @@ export default function JobPostingsTimeLine({
           levelColors[d] ||
           d3.schemeCategory10[aggregatedData.experienceLevels.indexOf(d) % 10],
       )
-      .attr("opacity", (d) => {
-        // Make sure all legends are visible by default
-        // If we have selected levels, highlight only those
-        if (selectedLevels.length === 0) return 1;
-        return selectedLevels.includes(d) ? 1 : 0.3;
-      });
+      .attr("opacity", (d) => (visibleExperienceLevels.includes(d) ? 1 : 0.3));
 
     legend
       .append("text")
@@ -651,12 +645,6 @@ export default function JobPostingsTimeLine({
       .attr("y", 7.5)
       .attr("dy", "0.32em")
       .style("fill", "#e2e8f0")
-      .style("opacity", (d) => {
-        // If nothing is selected, show all text at full opacity
-        if (selectedLevels.length === 0) return 1;
-        // Otherwise, highlight selected items
-        return selectedLevels.includes(d) ? 1 : 0.5;
-      })
       .text((d) => d);
 
     // Add brush component for zooming
@@ -770,71 +758,49 @@ export default function JobPostingsTimeLine({
     redrawTrigger,
   ]);
 
-  // Initialize selected levels
+  // Handle closing the filter menu when clicking outside
   useEffect(() => {
-    if (data && data.experienceLevels && data.experienceLevels.length > 0) {
-      // Start with all levels selected
-      setSelectedLevels(data.experienceLevels);
-    }
-  }, [data]);
+    const handleClickOutside = (event: MouseEvent) => {
+      if (filterMenuRef.current && !filterMenuRef.current.contains(event.target as Node)) {
+        setIsFilterMenuOpen(false);
+      }
+    };
 
-  // Effect to update line styling based on selected levels
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [filterMenuRef]);
+
+  // Effect to update line styling based on filtered experience levels
   useEffect(() => {
     if (!svgRef.current || isLoading || !data) return;
 
     // Get all timeline lines
     const lines = d3.select(svgRef.current).selectAll(".timeline-line");
 
-    // Update classes based on selected levels
+    // Update classes based on filter selections
     lines.each(function () {
       const line = d3.select(this);
       const level = line.attr("data-level");
 
       if (!level) return; // Skip if no level attribute
 
-      // Check if this level is in the selected levels
-      const isSelected = selectedLevels.includes(level);
+      // Check if this level is in the filters
+      const isSelected = filters.experienceLevels.includes(level);
 
       // Update class based on selection state
-      if (selectedLevels.length === 0) {
-        // No selection means show all lines normally
-        line.classed("selected", false).classed("faded", false);
-      } else if (isSelected) {
-        // Show selected lines highlighted
+      if (isSelected) {
         line.classed("selected", true).classed("faded", false);
-      } else {
-        // Fade out non-selected lines
+      } else if (filters.experienceLevels.length > 0) {
+        // If some filters are active but this one isn't selected
         line.classed("selected", false).classed("faded", true);
+      } else {
+        // No filters active
+        line.classed("selected", false).classed("faded", false);
       }
     });
-  }, [selectedLevels, data, isLoading]);
-  
-  // Effect to sync selectedLevels with global filters
-  // This is separated to avoid update loops
-  useEffect(() => {
-    // Skip if we're still loading
-    if (isLoading) return;
-    
-    // Find if selected levels differ from experience filters
-    const currentFilterLevels = filters.experienceLevels || [];
-    
-    // Only update if necessary to avoid infinite loops
-    const needsUpdate = 
-      (selectedLevels.length !== currentFilterLevels.length) || 
-      selectedLevels.some(level => !currentFilterLevels.includes(level));
-      
-    if (needsUpdate) {
-      const newFilters = { ...filters };
-      
-      if (selectedLevels.length > 0) {
-        newFilters.experienceLevels = [...selectedLevels];
-      } else {
-        newFilters.experienceLevels = [];
-      }
-      
-      setFilters(newFilters);
-    }
-  }, [selectedLevels, isLoading]);
+  }, [filters.experienceLevels, data, isLoading]);
 
   if (isLoading) {
     return (
@@ -879,7 +845,105 @@ export default function JobPostingsTimeLine({
           <h3 className="text-sm font-semibold bg-gradient-to-r from-cyan-400 to-blue-500 text-transparent bg-clip-text">
             Job Posting Trends
           </h3>
-          <span className="ml-2 text-xs text-gray-400">Click on lines or legend to filter</span>
+          <div className="relative ml-2">
+            <Button 
+              size="sm" 
+              variant="outline" 
+              className="h-6 px-2 py-0 text-xs border-blue-600/40 bg-blue-950/30 hover:bg-blue-900/40"
+              onClick={() => setIsFilterMenuOpen(!isFilterMenuOpen)}
+            >
+              <span className="flex items-center gap-1">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
+                </svg>
+                Filters
+                {filters.experienceLevels.length > 0 && (
+                  <span className="inline-flex items-center justify-center w-4 h-4 text-xs font-bold text-white bg-blue-600 rounded-full">
+                    {filters.experienceLevels.length}
+                  </span>
+                )}
+              </span>
+            </Button>
+            
+            {isFilterMenuOpen && (
+              <div 
+                ref={filterMenuRef}
+                className="absolute top-full left-0 mt-1 w-52 bg-gray-900 border border-blue-900/60 rounded-md shadow-lg z-20 p-2"
+              >
+                <div className="mb-2 pb-1 border-b border-gray-800 flex justify-between items-center">
+                  <span className="text-xs font-medium text-gray-400">Experience Levels</span>
+                  <div className="flex gap-1">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-5 px-1.5 py-0 text-[10px] text-blue-400 hover:text-white hover:bg-blue-900/30"
+                      onClick={() => {
+                        // Select all experience levels
+                        const newFilters = { 
+                          ...filters, 
+                          experienceLevels: [...data.experienceLevels] 
+                        };
+                        setFilters(newFilters);
+                      }}
+                    >
+                      Select All
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-5 px-1.5 py-0 text-[10px] text-gray-400 hover:text-white"
+                      onClick={() => {
+                        // Clear all experience level filters
+                        const newFilters = { ...filters, experienceLevels: [] };
+                        setFilters(newFilters);
+                      }}
+                    >
+                      Clear
+                    </Button>
+                  </div>
+                </div>
+                <div className="max-h-56 overflow-y-auto pr-1 filter-dropdown-menu">
+                  {data.experienceLevels.map((level) => {
+                    const isSelected = filters.experienceLevels.includes(level);
+                    return (
+                      <div 
+                        key={level}
+                        className={`flex items-center py-1 px-2 rounded-sm mb-1 cursor-pointer hover:bg-blue-900/20 ${
+                          isSelected ? 'bg-blue-900/30 text-blue-300' : 'text-gray-300'
+                        }`}
+                        onClick={() => {
+                          const newFilters = { ...filters };
+                          if (isSelected) {
+                            // Remove from filters
+                            newFilters.experienceLevels = newFilters.experienceLevels.filter(
+                              (l) => l !== level
+                            );
+                          } else {
+                            // Add to filters
+                            newFilters.experienceLevels = [...newFilters.experienceLevels, level];
+                          }
+                          setFilters(newFilters);
+                        }}
+                      >
+                        <div className={`w-3.5 h-3.5 mr-2 rounded-sm border ${
+                          isSelected 
+                            ? 'bg-blue-500 border-blue-500' 
+                            : 'border-gray-600'
+                        }`}>
+                          {isSelected && (
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="white">
+                              <path d="M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0Z" />
+                            </svg>
+                          )}
+                        </div>
+                        <span className="text-xs">{level}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
         <div className="flex items-center gap-1">
           <Button

@@ -143,10 +143,10 @@ export default function SalaryJobTitleRidgeline({ data, isLoading }: SalaryJobTi
       return;
     }
 
-    // Select job titles to display (top 10 if showTopTitles is true, or max 20 for "All")
+    // Select job titles to display (top 5 if showTopTitles is true, or max 15 for "All")
     const displayedTitles = showTopTitles
-      ? displayJobTitles.slice(0, Math.min(10, displayJobTitles.length)) // Top 10 highest paying positions
-      : displayJobTitles.slice(0, Math.min(20, displayJobTitles.length)); // Cap at 20 titles for readability
+      ? displayJobTitles.slice(0, Math.min(5, displayJobTitles.length)) // Top 5 highest paying positions
+      : displayJobTitles.slice(0, Math.min(15, displayJobTitles.length)); // Cap at 15 titles for readability
 
     // Find global min and max for x scale with safety checks
     let globalMin = d3.min(displayedTitles, d => d.min) || 0;
@@ -689,7 +689,7 @@ export default function SalaryJobTitleRidgeline({ data, isLoading }: SalaryJobTi
                 }
               }}
             >
-              Top 10
+              Top 5
             </Button>
           </div>
         </div>

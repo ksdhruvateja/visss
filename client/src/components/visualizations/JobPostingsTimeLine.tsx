@@ -592,40 +592,37 @@ export default function JobPostingsTimeLine({
         // Get the experience level for this legend item
         const experienceLevel = d;
         
-        // Check if this level is already selected in the filters
-        const isInFilters = filters.experienceLevels.includes(experienceLevel);
+        // Check if this level is already in our selected levels
+        const isAlreadySelected = selectedLevels.includes(experienceLevel);
         
-        // Toggle selection state
-        const newFilters = { ...filters };
-        
-        if (isInFilters) {
-          // If already selected, remove from filters
-          newFilters.experienceLevels = newFilters.experienceLevels.filter(
-            (e) => e !== experienceLevel
-          );
+        // Toggle selection state for this level
+        if (isAlreadySelected) {
+          // If it's the only selected level, clear selection
+          if (selectedLevels.length === 1) {
+            setSelectedLevels([]);
+          } else {
+            // Otherwise remove this level from selection
+            setSelectedLevels(selectedLevels.filter(level => level !== experienceLevel));
+          }
         } else {
-          // If not selected, add to filters
-          newFilters.experienceLevels = [
-            ...newFilters.experienceLevels,
-            experienceLevel
-          ];
+          // Add this level to our selections
+          setSelectedLevels([...selectedLevels, experienceLevel]);
         }
-        
-        // Update the filters
-        setFilters(newFilters);
         
         // Update the active item to highlight in filter context
         setActiveItem({ type: "experienceLevel", value: experienceLevel });
         
-        // Also update visibility in the chart itself
-        const isCurrentlyVisible = visibleExperienceLevels.includes(experienceLevel);
-        if (isCurrentlyVisible && visibleExperienceLevels.length > 1) {
-          setVisibleExperienceLevels(
-            visibleExperienceLevels.filter((l) => l !== experienceLevel)
-          );
-        } else if (!isCurrentlyVisible) {
-          setVisibleExperienceLevels([...visibleExperienceLevels, experienceLevel]);
-        }
+        // Update highlighting for this legend item immediately
+        const newSelected = !isAlreadySelected;
+        const legendItem = d3.select(this);
+        
+        // Update rect opacity
+        legendItem.select("rect")
+          .attr("opacity", newSelected ? 1 : 0.3);
+        
+        // Update text opacity  
+        legendItem.select("text")
+          .style("opacity", newSelected ? 1 : 0.5);
       });
 
     legend
@@ -641,7 +638,12 @@ export default function JobPostingsTimeLine({
           levelColors[d] ||
           d3.schemeCategory10[aggregatedData.experienceLevels.indexOf(d) % 10],
       )
-      .attr("opacity", (d) => (visibleExperienceLevels.includes(d) ? 1 : 0.3));
+      .attr("opacity", (d) => {
+        // Make sure all legends are visible by default
+        // If we have selected levels, highlight only those
+        if (selectedLevels.length === 0) return 1;
+        return selectedLevels.includes(d) ? 1 : 0.3;
+      });
 
     legend
       .append("text")
@@ -649,6 +651,12 @@ export default function JobPostingsTimeLine({
       .attr("y", 7.5)
       .attr("dy", "0.32em")
       .style("fill", "#e2e8f0")
+      .style("opacity", (d) => {
+        // If nothing is selected, show all text at full opacity
+        if (selectedLevels.length === 0) return 1;
+        // Otherwise, highlight selected items
+        return selectedLevels.includes(d) ? 1 : 0.5;
+      })
       .text((d) => d);
 
     // Add brush component for zooming

@@ -27,6 +27,8 @@ export default function JobPostingsTimeLine({
   const [brushExtent, setBrushExtent] = useState<[Date, Date] | null>(null);
   const [redrawTrigger, setRedrawTrigger] = useState(0);
   const [isFilterMenuOpen, setIsFilterMenuOpen] = useState(false);
+  const [filterTab, setFilterTab] = useState<'experience' | 'employment'>('experience');
+  const [employmentTypes, setEmploymentTypes] = useState<string[]>([]);
   const filterMenuRef = useRef<HTMLDivElement | null>(null);
   const { filters, setFilters, activeItem, setActiveItem } = useFilterContext();
 

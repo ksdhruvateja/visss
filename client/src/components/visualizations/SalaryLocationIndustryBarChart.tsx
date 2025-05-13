@@ -247,14 +247,19 @@ export default function SalaryLocationIndustryBarChart({ data, isLoading }: Sala
         setActiveIndustries(newActiveIndustries);
         
         // Also update global filters
-        const newIndustryFilters = filters.industries.includes(d)
-          ? filters.industries.filter(i => i !== d) 
-          : [...filters.industries, d];
-        
-        setFilters({
-          ...filters,
-          industries: newIndustryFilters
-        });
+        if (filters.industries.includes(d)) {
+          // Remove if present
+          setFilters({
+            ...filters,
+            industries: filters.industries.filter(industry => industry !== d)
+          });
+        } else {
+          // Add if not present
+          setFilters({
+            ...filters,
+            industries: [...filters.industries, d]
+          });
+        }
       });
 
     legend.append('rect')
@@ -418,14 +423,19 @@ export default function SalaryLocationIndustryBarChart({ data, isLoading }: Sala
                   setActiveIndustries(newActiveIndustries);
                   
                   // Update global filters to match exactly
-                  const newIndustryFilters = filters.industries.includes(industry)
-                    ? filters.industries.filter(i => i !== industry) // Remove if present
-                    : [...filters.industries, industry]; // Add if not present
-                  
-                  setFilters({
-                    ...filters,
-                    industries: newIndustryFilters
-                  });
+                  if (filters.industries.includes(industry)) {
+                    // Remove if present
+                    setFilters({
+                      ...filters,
+                      industries: filters.industries.filter(industry2 => industry2 !== industry)
+                    });
+                  } else {
+                    // Add if not present
+                    setFilters({
+                      ...filters,
+                      industries: [...filters.industries, industry]
+                    });
+                  }
                   
                   // Update the active item state for cross-chart highlighting
                   if (newActiveIndustries.includes(industry) && !activeIndustries.includes(industry)) {

@@ -10,12 +10,12 @@ interface HiringPulseChartProps {
   isLoading: boolean;
 }
 
-type ViewMode = "heatmap" | "bubble" | "trend";
+type ViewMode = "bubble" | "trend";
 
 export default function HiringPulseChart({ data, isLoading }: HiringPulseChartProps) {
   const svgRef = useRef<SVGSVGElement | null>(null);
   const tooltipRef = useRef<HTMLDivElement | null>(null);
-  const [viewMode, setViewMode] = useState<ViewMode>("heatmap");
+  const [viewMode, setViewMode] = useState<ViewMode>("trend");
   const [focusedElement, setFocusedElement] = useState<string | null>(null);
   const [animationTrigger, setAnimationTrigger] = useState(0);
   const { filters, setFilters, activeItem, setActiveItem } = useFilterContext();
@@ -73,206 +73,8 @@ export default function HiringPulseChart({ data, isLoading }: HiringPulseChartPr
 
   const aggregatedData = getAggregatedData();
   
-  // Render heatmap visualization
-  const renderHeatmap = () => {
-    if (!svgRef.current || !aggregatedData) return;
-    
-    // Clear previous visualization
-    const svg = d3.select(svgRef.current);
-    svg.selectAll("*").remove();
-    
-    // Set up dimensions and margins
-    const margin = { top: 30, right: 50, bottom: 50, left: 120 };
-    const width = svgRef.current.clientWidth - margin.left - margin.right;
-    const height = svgRef.current.clientHeight - margin.top - margin.bottom;
-    
-    // Create the SVG container
-    const g = svg
-      .append("g")
-      .attr("transform", `translate(${margin.left},${margin.top})`);
-      
-    // Define scales
-    const xScale = d3.scaleBand()
-      .domain(aggregatedData.industries)
-      .range([0, width])
-      .padding(0.05);
-      
-    const yScale = d3.scaleBand()
-      .domain(aggregatedData.experienceLevels)
-      .range([0, height])
-      .padding(0.05);
-      
-    // Find max value for color scale
-    const maxValue = d3.max(
-      aggregatedData.experienceLevels.flatMap(level => 
-        aggregatedData.industries.map(industry => 
-          aggregatedData.byExperienceAndIndustry[level][industry] || 0
-        )
-      )
-    ) || 0;
-    
-    // Color scale
-    const colorScale = d3.scaleSequential(d3.interpolateInferno)
-      .domain([0, maxValue]);
-    
-    // Create heatmap cells
-    g.selectAll(".heatmap-cell")
-      .data(aggregatedData.experienceLevels.flatMap(level => 
-        aggregatedData.industries.map(industry => ({
-          level,
-          industry,
-          value: aggregatedData.byExperienceAndIndustry[level][industry] || 0
-        }))
-      ))
-      .join("rect")
-      .attr("class", "heatmap-cell")
-      .attr("x", d => xScale(d.industry) || 0)
-      .attr("y", d => yScale(d.level) || 0)
-      .attr("rx", 2)
-      .attr("ry", 2)
-      .attr("width", xScale.bandwidth())
-      .attr("height", yScale.bandwidth())
-      .attr("fill", d => colorScale(d.value))
-      .attr("opacity", 0)
-      .attr("stroke", "#1a2030")
-      .attr("stroke-width", 1)
-      .attr("data-level", d => d.level)
-      .attr("data-industry", d => d.industry)
-      .on("mouseover", function(event, d) {
-        // Highlight this cell
-        d3.select(this)
-          .attr("stroke", "#ffffff")
-          .attr("stroke-width", 2);
-          
-        // Show tooltip
-        const tooltip = d3.select(tooltipRef.current);
-        tooltip
-          .style("display", "block")
-          .style("left", `${event.pageX + 10}px`)
-          .style("top", `${event.pageY - 25}px`)
-          .html(`
-            <div class="font-semibold">${d.industry}</div>
-            <div>${d.level}</div>
-            <div class="text-blue-400">${d.value} jobs</div>
-          `);
-      })
-      .on("mouseout", function() {
-        // Remove highlight
-        d3.select(this)
-          .attr("stroke", "#1a2030")
-          .attr("stroke-width", 1);
-          
-        // Hide tooltip
-        d3.select(tooltipRef.current).style("display", "none");
-      })
-      .on("click", (event, d) => {
-        // Update filters
-        const newFilters = { ...filters };
-        
-        // Toggle experience level
-        if (!newFilters.experienceLevels.includes(d.level)) {
-          newFilters.experienceLevels = [d.level];
-        } else {
-          newFilters.experienceLevels = [];
-        }
-        
-        // Update filters
-        setFilters(newFilters);
-        setFocusedElement(d.level);
-      })
-      .transition()
-      .duration(800)
-      .delay((d, i) => i * 15)
-      .attr("opacity", 1);
-      
-    // Add X axis
-    g.append("g")
-      .attr("class", "x-axis")
-      .attr("transform", `translate(0,${height})`)
-      .call(d3.axisBottom(xScale))
-      .selectAll("text")
-      .attr("y", 10)
-      .attr("x", 0)
-      .attr("dy", ".35em")
-      .attr("transform", "rotate(0)")
-      .style("text-anchor", "middle")
-      .style("fill", "#e5e7eb")
-      .style("font-size", "10px");
-      
-    // Add Y axis
-    g.append("g")
-      .attr("class", "y-axis")
-      .call(d3.axisLeft(yScale))
-      .selectAll("text")
-      .style("fill", "#e5e7eb")
-      .style("font-size", "10px");
-      
-    // Add title
-    g.append("text")
-      .attr("class", "chart-title")
-      .attr("x", width / 2)
-      .attr("y", -10)
-      .attr("text-anchor", "middle")
-      .style("fill", "#ffffff")
-      .style("font-size", "12px")
-      .text("Job Distribution by Industry & Experience Level");
-      
-    // Add color legend
-    const legendWidth = width * 0.6;
-    const legendHeight = 10;
-    
-    const legend = g.append("g")
-      .attr("class", "legend")
-      .attr("transform", `translate(${(width - legendWidth) / 2},${height + 40})`);
-      
-    // Create gradient for legend
-    const defs = svg.append("defs");
-    const gradient = defs.append("linearGradient")
-      .attr("id", "legend-gradient")
-      .attr("x1", "0%")
-      .attr("x2", "100%")
-      .attr("y1", "0%")
-      .attr("y2", "0%");
-      
-    // Add color stops
-    const numStops = 10;
-    for (let i = 0; i <= numStops; i++) {
-      const offset = i / numStops;
-      gradient.append("stop")
-        .attr("offset", `${offset * 100}%`)
-        .attr("stop-color", colorScale(maxValue * offset));
-    }
-    
-    // Draw legend rectangle
-    legend.append("rect")
-      .attr("width", legendWidth)
-      .attr("height", legendHeight)
-      .attr("fill", "url(#legend-gradient)");
-      
-    // Add legend axis
-    const legendScale = d3.scaleLinear()
-      .domain([0, maxValue])
-      .range([0, legendWidth]);
-      
-    legend.append("g")
-      .attr("transform", `translate(0,${legendHeight})`)
-      .call(d3.axisBottom(legendScale)
-        .ticks(5)
-        .tickSize(-legendHeight))
-      .selectAll("text")
-      .style("fill", "#e5e7eb")
-      .style("font-size", "8px");
-      
-    // Add legend title
-    legend.append("text")
-      .attr("class", "legend-title")
-      .attr("x", legendWidth / 2)
-      .attr("y", legendHeight + 25)
-      .attr("text-anchor", "middle")
-      .style("fill", "#a3a8b8")
-      .style("font-size", "8px")
-      .text("Job Count");
-  };
+  // Define detailed bubble and trend visualizations
+  
   
   // Render bubble chart visualization
   const renderBubbleChart = () => {
@@ -706,9 +508,6 @@ export default function HiringPulseChart({ data, isLoading }: HiringPulseChartPr
     if (isLoading || !aggregatedData) return;
     
     switch (viewMode) {
-      case "heatmap":
-        renderHeatmap();
-        break;
       case "bubble":
         renderBubbleChart();
         break;
@@ -716,7 +515,7 @@ export default function HiringPulseChart({ data, isLoading }: HiringPulseChartPr
         renderTrendChart();
         break;
       default:
-        renderHeatmap();
+        renderTrendChart();
     }
   }, [viewMode, isLoading, aggregatedData, filters, animationTrigger]);
   
@@ -733,9 +532,7 @@ export default function HiringPulseChart({ data, isLoading }: HiringPulseChartPr
         
         if (filters.experienceLevels.includes(level)) {
           // Element is selected
-          if (element.classed("heatmap-cell")) {
-            element.attr("stroke", "#ffffff").attr("stroke-width", 2);
-          } else if (element.classed("bubble")) {
+          if (element.classed("bubble")) {
             element.attr("stroke", "#ffffff").attr("stroke-width", 2).attr("stroke-opacity", 1);
           } else if (element.classed("trend-line")) {
             element.attr("stroke-width", 3).attr("opacity", 1);
@@ -744,9 +541,7 @@ export default function HiringPulseChart({ data, isLoading }: HiringPulseChartPr
           }
         } else {
           // Element is not selected
-          if (element.classed("heatmap-cell")) {
-            element.attr("stroke", "#1a2030").attr("stroke-width", 1).attr("opacity", 0.5);
-          } else if (element.classed("bubble")) {
+          if (element.classed("bubble")) {
             element.attr("stroke-opacity", 0.3).attr("stroke-width", 1).attr("fill-opacity", 0.3);
           } else if (element.classed("trend-line")) {
             element.attr("stroke-width", 1).attr("opacity", 0.3);
@@ -757,7 +552,6 @@ export default function HiringPulseChart({ data, isLoading }: HiringPulseChartPr
       });
     } else {
       // Reset all styling
-      d3.selectAll(".heatmap-cell").attr("stroke", "#1a2030").attr("stroke-width", 1).attr("opacity", 1);
       d3.selectAll(".bubble").attr("stroke-opacity", 0.3).attr("stroke-width", 1).attr("fill-opacity", 0.7);
       d3.selectAll(".trend-line").attr("stroke-width", 2).attr("opacity", 1);
       d3.selectAll(".data-point").attr("r", 4).attr("stroke", "#000").attr("stroke-width", 1).attr("opacity", 1);
@@ -809,14 +603,6 @@ export default function HiringPulseChart({ data, isLoading }: HiringPulseChartPr
           <Button
             size="sm"
             variant="ghost"
-            className={`h-6 px-2 py-0 text-xs ${viewMode === "heatmap" ? "bg-blue-900/30 text-blue-400" : "text-gray-400"}`}
-            onClick={() => setViewMode("heatmap")}
-          >
-            Heat
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
             className={`h-6 px-2 py-0 text-xs ${viewMode === "bubble" ? "bg-blue-900/30 text-blue-400" : "text-gray-400"}`}
             onClick={() => setViewMode("bubble")}
           >
@@ -828,7 +614,7 @@ export default function HiringPulseChart({ data, isLoading }: HiringPulseChartPr
             className={`h-6 px-2 py-0 text-xs ${viewMode === "trend" ? "bg-blue-900/30 text-blue-400" : "text-gray-400"}`}
             onClick={() => setViewMode("trend")}
           >
-            Trend
+            Line Graph
           </Button>
           <Button
             size="sm"

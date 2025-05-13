@@ -28,7 +28,7 @@ export default function SalaryPostingDateScatter({ data, isLoading }: SalaryPost
     svg.selectAll('*').remove();
 
     // Set up dimensions and margins - increased left margin for better label visibility
-    const margin = { top: 30, right: 30, bottom: 50, left: 90 };
+    const margin = { top: 30, right: 30, bottom: 90, left: 90 };
     const width = svgRef.current!.clientWidth - margin.left - margin.right;
     const height = svgRef.current!.clientHeight - margin.top - margin.bottom;
 
@@ -52,13 +52,15 @@ export default function SalaryPostingDateScatter({ data, isLoading }: SalaryPost
       .domain([0, d3.max(salaryValues) as number * 1.1])
       .range([height, 0]);
 
-    // Add X axis
+    // Add X axis with vertical labels
     g.append('g')
       .attr('transform', `translate(0,${height})`)
       .call(d3.axisBottom(x))
       .selectAll('text')
       .style('font-size', '12px')
-      .style('fill', '#e2e8f0'); // Light color for better visibility
+      .style('fill', '#e2e8f0')
+      .attr('transform', 'translate(-10,10)rotate(-90)')
+      .style('text-anchor', 'end'); // Light color for better visibility
       
     // Style the axis lines  
     g.selectAll('.domain, .tick line')

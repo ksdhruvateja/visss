@@ -73,9 +73,6 @@ export default function HiringPulseChart({ data, isLoading }: HiringPulseChartPr
 
   const aggregatedData = getAggregatedData();
   
-  // Define detailed bubble and trend visualizations
-  
-  
   // Render bubble chart visualization
   const renderBubbleChart = () => {
     if (!svgRef.current || !aggregatedData) return;
@@ -595,41 +592,46 @@ export default function HiringPulseChart({ data, isLoading }: HiringPulseChartPr
 
   return (
     <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-lg shadow overflow-hidden border border-gray-700 h-full flex flex-col">
-      <div className="p-2 border-b border-gray-700 flex items-center justify-between">
-        <h3 className="text-sm font-semibold bg-gradient-to-r from-cyan-400 to-blue-500 text-transparent bg-clip-text">
-          Hiring Pulse
-        </h3>
-        <div className="flex items-center gap-1">
-          <Button
-            size="sm"
-            variant="ghost"
-            className={`h-6 px-2 py-0 text-xs ${viewMode === "bubble" ? "bg-blue-900/30 text-blue-400" : "text-gray-400"}`}
-            onClick={() => setViewMode("bubble")}
-          >
-            Bubble
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            className={`h-6 px-2 py-0 text-xs ${viewMode === "trend" ? "bg-blue-900/30 text-blue-400" : "text-gray-400"}`}
-            onClick={() => setViewMode("trend")}
-          >
-            Line Graph
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-6 w-6 p-0 text-xs text-gray-400 ml-2"
-            onClick={() => setAnimationTrigger(prev => prev + 1)}
-            title="Refresh visualization"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21 2v6h-6"></path>
-              <path d="M3 12a9 9 0 0 1 15-6.7L21 8"></path>
-              <path d="M3 22v-6h6"></path>
-              <path d="M21 12a9 9 0 0 1-15 6.7L3 16"></path>
-            </svg>
-          </Button>
+      <div className="p-2 border-b border-gray-700 flex flex-col">
+        <div className="flex items-center justify-between mb-1">
+          <h3 className="text-sm font-semibold bg-gradient-to-r from-cyan-400 to-blue-500 text-transparent bg-clip-text">
+            Hiring Pulse
+          </h3>
+          <div className="flex items-center gap-1">
+            <Button
+              size="sm"
+              variant="ghost"
+              className={`h-6 px-2 py-0 text-xs ${viewMode === "bubble" ? "bg-blue-900/30 text-blue-400" : "text-gray-400"}`}
+              onClick={() => setViewMode("bubble")}
+            >
+              Bubble
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              className={`h-6 px-2 py-0 text-xs ${viewMode === "trend" ? "bg-blue-900/30 text-blue-400" : "text-gray-400"}`}
+              onClick={() => setViewMode("trend")}
+            >
+              Line Graph
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-6 w-6 p-0 text-xs text-gray-400 ml-2"
+              onClick={() => setAnimationTrigger(prev => prev + 1)}
+              title="Refresh visualization"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 2v6h-6"></path>
+                <path d="M3 12a9 9 0 0 1 15-6.7L21 8"></path>
+                <path d="M3 22v-6h6"></path>
+                <path d="M21 12a9 9 0 0 1-15 6.7L3 16"></path>
+              </svg>
+            </Button>
+          </div>
+        </div>
+        <div className="text-xs text-gray-400 mb-2">
+          Switch between bubble chart and line graph views to analyze job distribution patterns across experience levels with detailed interactive animations.
         </div>
       </div>
       <div className="flex-grow p-2 relative">

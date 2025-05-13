@@ -26,10 +26,7 @@ export default function JobPostingsTimeLine({
   >([]);
   const [brushExtent, setBrushExtent] = useState<[Date, Date] | null>(null);
   const [redrawTrigger, setRedrawTrigger] = useState(0);
-  const [isFilterMenuOpen, setIsFilterMenuOpen] = useState(false);
-  const [filterTab, setFilterTab] = useState<'experience' | 'employment'>('experience');
-  const [employmentTypes, setEmploymentTypes] = useState<string[]>([]);
-  const filterMenuRef = useRef<HTMLDivElement | null>(null);
+  const [selectedLevels, setSelectedLevels] = useState<string[]>([]);
   const { filters, setFilters, activeItem, setActiveItem } = useFilterContext();
 
   // Set visible experience levels when data changes
@@ -44,31 +41,7 @@ export default function JobPostingsTimeLine({
     }
   }, [data, isLoading]);
   
-  // Extract employment types from job data
-  useEffect(() => {
-    if (!isLoading) {
-      // We need to extract unique employment types from the raw job data
-      const uniqueTypes = new Set<string>();
-      
-      // Extract unique employment types from all jobs in the API response
-      fetch('/api/employment-data')
-        .then(response => response.json())
-        .then(responseData => {
-          if (responseData && responseData.jobs && Array.isArray(responseData.jobs)) {
-            responseData.jobs.forEach((job: any) => {
-              if (job.employmentType) {
-                uniqueTypes.add(job.employmentType);
-              }
-            });
-            
-            setEmploymentTypes(Array.from(uniqueTypes));
-          }
-        })
-        .catch(error => {
-          console.error("Error fetching employment types:", error);
-        });
-    }
-  }, [isLoading]);
+
 
   // Create a custom effect to ensure data points are interactive when zoomed in
   useEffect(() => {
@@ -551,45 +524,40 @@ export default function JobPostingsTimeLine({
           // Get the experience level for this point
           const experienceLevel = d.level;
           
-          // Check if this level is already selected in the filters
-          const isInFilters = filters.experienceLevels.includes(experienceLevel);
+          // Check if this level is already in our selected levels
+          const isAlreadySelected = selectedLevels.includes(experienceLevel);
           
-          // Toggle selection state
-          const newFilters = { ...filters };
-          
-          if (isInFilters) {
-            // If already selected, remove from filters
-            newFilters.experienceLevels = newFilters.experienceLevels.filter(
-              (e) => e !== experienceLevel
-            );
+          // Toggle selection state for this level
+          if (isAlreadySelected) {
+            // If it's the only selected level, clear selection
+            if (selectedLevels.length === 1) {
+              setSelectedLevels([]);
+            } else {
+              // Otherwise remove this level from selection
+              setSelectedLevels(selectedLevels.filter(level => level !== experienceLevel));
+            }
           } else {
-            // If not selected, add to filters
-            newFilters.experienceLevels = [
-              ...newFilters.experienceLevels,
-              experienceLevel
-            ];
+            // Add this level to our selections
+            setSelectedLevels([...selectedLevels, experienceLevel]);
           }
-          
-          // Update the filters
-          setFilters(newFilters);
           
           // Update the active item to highlight in filter context
           setActiveItem({ type: "experienceLevel", value: experienceLevel });
           
           // Update visual indication of selection
-          const isSelected = !isInFilters; // New state after toggle
+          const newSelected = !isAlreadySelected;
           d3.select(this)
-            .classed("selected", isSelected)
-            .attr("stroke", isSelected ? "#fff" : "#2d3748")
-            .attr("stroke-width", isSelected ? 2 : 1.5);
+            .classed("selected", newSelected)
+            .attr("stroke", newSelected ? "#fff" : "#2d3748")
+            .attr("stroke-width", newSelected ? 2 : 1.5);
 
           // Show updated tooltip with selection state
           tooltip.style("opacity", 1).html(`
               <div class="font-medium">${d.level}</div>
               <div>${format(parseDate(d.time), "MMMM yyyy")}</div>
               <div>Job Count: ${d.count}</div>
-              <div class="text-xs italic text-${isSelected ? "green" : "red"}-400">
-                ${isSelected ? "✓ Added to filters" : "✕ Removed from filters"}
+              <div class="text-xs italic text-${newSelected ? "green" : "red"}-400">
+                ${newSelected ? "✓ Added to filters" : "✕ Removed from filters"}
               </div>
             `);
 
@@ -794,49 +762,71 @@ export default function JobPostingsTimeLine({
     redrawTrigger,
   ]);
 
-  // Handle closing the filter menu when clicking outside
+  // Initialize selected levels
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (filterMenuRef.current && !filterMenuRef.current.contains(event.target as Node)) {
-        setIsFilterMenuOpen(false);
-      }
-    };
+    if (data && data.experienceLevels && data.experienceLevels.length > 0) {
+      // Start with all levels selected
+      setSelectedLevels(data.experienceLevels);
+    }
+  }, [data]);
 
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [filterMenuRef]);
-
-  // Effect to update line styling based on filtered experience levels
+  // Effect to update line styling based on selected levels
   useEffect(() => {
     if (!svgRef.current || isLoading || !data) return;
 
     // Get all timeline lines
     const lines = d3.select(svgRef.current).selectAll(".timeline-line");
 
-    // Update classes based on filter selections
+    // Update classes based on selected levels
     lines.each(function () {
       const line = d3.select(this);
       const level = line.attr("data-level");
 
       if (!level) return; // Skip if no level attribute
 
-      // Check if this level is in the filters
-      const isSelected = filters.experienceLevels.includes(level);
+      // Check if this level is in the selected levels
+      const isSelected = selectedLevels.includes(level);
 
       // Update class based on selection state
-      if (isSelected) {
-        line.classed("selected", true).classed("faded", false);
-      } else if (filters.experienceLevels.length > 0) {
-        // If some filters are active but this one isn't selected
-        line.classed("selected", false).classed("faded", true);
-      } else {
-        // No filters active
+      if (selectedLevels.length === 0) {
+        // No selection means show all lines normally
         line.classed("selected", false).classed("faded", false);
+      } else if (isSelected) {
+        // Show selected lines highlighted
+        line.classed("selected", true).classed("faded", false);
+      } else {
+        // Fade out non-selected lines
+        line.classed("selected", false).classed("faded", true);
       }
     });
-  }, [filters.experienceLevels, data, isLoading]);
+  }, [selectedLevels, data, isLoading]);
+  
+  // Effect to sync selectedLevels with global filters
+  // This is separated to avoid update loops
+  useEffect(() => {
+    // Skip if we're still loading
+    if (isLoading) return;
+    
+    // Find if selected levels differ from experience filters
+    const currentFilterLevels = filters.experienceLevels || [];
+    
+    // Only update if necessary to avoid infinite loops
+    const needsUpdate = 
+      (selectedLevels.length !== currentFilterLevels.length) || 
+      selectedLevels.some(level => !currentFilterLevels.includes(level));
+      
+    if (needsUpdate) {
+      const newFilters = { ...filters };
+      
+      if (selectedLevels.length > 0) {
+        newFilters.experienceLevels = [...selectedLevels];
+      } else {
+        newFilters.experienceLevels = [];
+      }
+      
+      setFilters(newFilters);
+    }
+  }, [selectedLevels, isLoading]);
 
   if (isLoading) {
     return (
@@ -881,212 +871,7 @@ export default function JobPostingsTimeLine({
           <h3 className="text-sm font-semibold bg-gradient-to-r from-cyan-400 to-blue-500 text-transparent bg-clip-text">
             Job Posting Trends
           </h3>
-          <div className="relative ml-2">
-            <Button 
-              size="sm" 
-              variant="outline" 
-              className="h-6 px-2 py-0 text-xs border-blue-600/40 bg-blue-950/30 hover:bg-blue-900/40"
-              onClick={() => setIsFilterMenuOpen(!isFilterMenuOpen)}
-            >
-              <span className="flex items-center gap-1">
-                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
-                </svg>
-                Filters
-                {(filters.experienceLevels.length > 0 || filters.employmentTypes.length > 0) && (
-                  <span className="inline-flex items-center justify-center w-4 h-4 text-xs font-bold text-white bg-blue-600 rounded-full">
-                    {filters.experienceLevels.length + filters.employmentTypes.length}
-                  </span>
-                )}
-              </span>
-            </Button>
-            
-            {isFilterMenuOpen && (
-              <div 
-                ref={filterMenuRef}
-                className="absolute top-full left-0 mt-1 w-64 bg-gray-900 border border-blue-900/60 rounded-md shadow-lg z-20 p-2"
-              >
-                <div className="mb-2 flex border-b border-gray-800">
-                  <button
-                    className={`flex-1 text-xs py-1 px-2 border-b-2 ${
-                      filterTab === 'experience' 
-                        ? 'border-blue-500 text-blue-400' 
-                        : 'border-transparent text-gray-400 hover:text-gray-300'
-                    }`}
-                    onClick={() => setFilterTab('experience')}
-                  >
-                    Experience Levels
-                  </button>
-                  <button
-                    className={`flex-1 text-xs py-1 px-2 border-b-2 ${
-                      filterTab === 'employment' 
-                        ? 'border-blue-500 text-blue-400' 
-                        : 'border-transparent text-gray-400 hover:text-gray-300'
-                    }`}
-                    onClick={() => setFilterTab('employment')}
-                  >
-                    Employment Types
-                  </button>
-                </div>
-                
-                {filterTab === 'experience' && (
-                  <>
-                    <div className="py-1 flex justify-between items-center">
-                      <span className="text-xs font-medium text-gray-400">
-                        {filters.experienceLevels.length === 0 ? "All Levels" : `Selected: ${filters.experienceLevels.length}`}
-                      </span>
-                      <div className="flex gap-1">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-5 px-1.5 py-0 text-[10px] text-blue-400 hover:text-white hover:bg-blue-900/30"
-                          onClick={() => {
-                            // Select all experience levels
-                            const newFilters = { 
-                              ...filters, 
-                              experienceLevels: [...data.experienceLevels] 
-                            };
-                            setFilters(newFilters);
-                          }}
-                        >
-                          Select All
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-5 px-1.5 py-0 text-[10px] text-gray-400 hover:text-white"
-                          onClick={() => {
-                            // Clear all experience level filters
-                            const newFilters = { ...filters, experienceLevels: [] };
-                            setFilters(newFilters);
-                          }}
-                        >
-                          Clear
-                        </Button>
-                      </div>
-                    </div>
-                    <div className="max-h-56 overflow-y-auto pr-1 filter-dropdown-menu">
-                      {data.experienceLevels.map((level) => {
-                        const isSelected = filters.experienceLevels.includes(level);
-                        return (
-                          <div 
-                            key={level}
-                            className={`flex items-center py-1 px-2 rounded-sm mb-1 cursor-pointer hover:bg-blue-900/20 ${
-                              isSelected ? 'bg-blue-900/30 text-blue-300' : 'text-gray-300'
-                            }`}
-                            onClick={() => {
-                              const newFilters = { ...filters };
-                              if (isSelected) {
-                                // Remove from filters
-                                newFilters.experienceLevels = newFilters.experienceLevels.filter(
-                                  (l) => l !== level
-                                );
-                              } else {
-                                // Add to filters
-                                newFilters.experienceLevels = [...newFilters.experienceLevels, level];
-                              }
-                              setFilters(newFilters);
-                            }}
-                          >
-                            <div className={`w-3.5 h-3.5 mr-2 rounded-sm border ${
-                              isSelected 
-                                ? 'bg-blue-500 border-blue-500' 
-                                : 'border-gray-600'
-                            }`}>
-                              {isSelected && (
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="white">
-                                  <path d="M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0Z" />
-                                </svg>
-                              )}
-                            </div>
-                            <span className="text-xs">{level}</span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </>
-                )}
-
-                {filterTab === 'employment' && (
-                  <>
-                    <div className="py-1 flex justify-between items-center">
-                      <span className="text-xs font-medium text-gray-400">
-                        {filters.employmentTypes.length === 0 ? "All Types" : `Selected: ${filters.employmentTypes.length}`}
-                      </span>
-                      <div className="flex gap-1">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-5 px-1.5 py-0 text-[10px] text-blue-400 hover:text-white hover:bg-blue-900/30"
-                          onClick={() => {
-                            // Select all employment types
-                            const newFilters = { 
-                              ...filters, 
-                              employmentTypes: [...employmentTypes] 
-                            };
-                            setFilters(newFilters);
-                          }}
-                        >
-                          Select All
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-5 px-1.5 py-0 text-[10px] text-gray-400 hover:text-white"
-                          onClick={() => {
-                            // Clear all employment type filters
-                            const newFilters = { ...filters, employmentTypes: [] };
-                            setFilters(newFilters);
-                          }}
-                        >
-                          Clear
-                        </Button>
-                      </div>
-                    </div>
-                    <div className="max-h-56 overflow-y-auto pr-1 filter-dropdown-menu">
-                      {employmentTypes.map((type) => {
-                        const isSelected = filters.employmentTypes.includes(type);
-                        return (
-                          <div 
-                            key={type}
-                            className={`flex items-center py-1 px-2 rounded-sm mb-1 cursor-pointer hover:bg-blue-900/20 ${
-                              isSelected ? 'bg-blue-900/30 text-blue-300' : 'text-gray-300'
-                            }`}
-                            onClick={() => {
-                              const newFilters = { ...filters };
-                              if (isSelected) {
-                                // Remove from filters
-                                newFilters.employmentTypes = newFilters.employmentTypes.filter(
-                                  (t) => t !== type
-                                );
-                              } else {
-                                // Add to filters
-                                newFilters.employmentTypes = [...newFilters.employmentTypes, type];
-                              }
-                              setFilters(newFilters);
-                            }}
-                          >
-                            <div className={`w-3.5 h-3.5 mr-2 rounded-sm border ${
-                              isSelected 
-                                ? 'bg-blue-500 border-blue-500' 
-                                : 'border-gray-600'
-                            }`}>
-                              {isSelected && (
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="white">
-                                  <path d="M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0Z" />
-                                </svg>
-                              )}
-                            </div>
-                            <span className="text-xs">{type}</span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </>
-                )}
-              </div>
-            )}
-          </div>
+          <span className="ml-2 text-xs text-gray-400">Click on lines or legend to filter</span>
         </div>
         <div className="flex items-center gap-1">
           <Button

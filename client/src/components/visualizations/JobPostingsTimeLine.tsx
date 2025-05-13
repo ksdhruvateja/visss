@@ -430,6 +430,15 @@ export default function JobPostingsTimeLine({ data, isLoading }: JobPostingsTime
         
         // Update the brush extent
         setBrushExtent(newDomain);
+        
+        // Store the currently active experience level to restore it after redraw
+        const activeExp = activeItem.type === 'experienceLevel' ? activeItem.value : null;
+        if (activeExp) {
+          // We'll restore this after the chart is redrawn
+          setTimeout(() => {
+            setActiveItem({ type: 'experienceLevel', value: activeExp });
+          }, 100);
+        }
       });
 
     // Add the brush to the SVG

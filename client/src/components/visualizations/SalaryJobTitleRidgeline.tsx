@@ -16,7 +16,9 @@ export default function SalaryJobTitleRidgeline({ data, isLoading }: SalaryJobTi
   const tooltipRef = useRef<HTMLDivElement | null>(null);
   const [showTopTitles, setShowTopTitles] = useState(true);
   const [redrawTrigger, setRedrawTrigger] = useState(0);
-  const { activeItem, setActiveItem } = useFilterContext();
+  const [visualizationStyle, setVisualizationStyle] = useState<'boxplot' | 'density' | 'bars'>('boxplot');
+  const [sortBy, setSortBy] = useState<'alphabetical' | 'median' | 'range'>('median');
+  const { filters, setFilters, activeItem, setActiveItem } = useFilterContext();
   
   // Formatting utilities 
   const formatSalary = (value: number): string => {
@@ -77,7 +79,7 @@ export default function SalaryJobTitleRidgeline({ data, isLoading }: SalaryJobTi
       .append('g')
       .attr('transform', `translate(${margin.left},${margin.top})`);
 
-    // Get the top job titles by salary median with additional error handling
+    // Get the top job titles by salary with additional error handling
     const jobTitlesByMedian = Object.entries(data.salaryRanges)
       .filter(([_, range]) => range && Array.isArray(range.values) && range.values.length > 0)
       .map(([title, range]) => {
@@ -104,6 +106,12 @@ export default function SalaryJobTitleRidgeline({ data, isLoading }: SalaryJobTi
           ? d3.quantile(sortedValues, 0.75) || max
           : median + (max - median) / 2;
           
+        // Calculate range size for sorting
+        const rangeSize = max - min;
+        
+        // Store all original values for density plot
+        const values = [...range.values];
+          
         return {
           title,
           median,
@@ -112,9 +120,22 @@ export default function SalaryJobTitleRidgeline({ data, isLoading }: SalaryJobTi
           max,
           q1,
           q3,
+          rangeSize,
+          values
         };
-      })
-      .sort((a, b) => b.median - a.median);
+      });
+    
+    // Apply sorting based on user selection
+    let displayJobTitles;
+    if (sortBy === 'median') {
+      displayJobTitles = [...jobTitlesByMedian].sort((a, b) => b.median - a.median);
+    } else if (sortBy === 'range') {
+      displayJobTitles = [...jobTitlesByMedian].sort((a, b) => b.rangeSize - a.rangeSize);
+    } else if (sortBy === 'alphabetical') {
+      displayJobTitles = [...jobTitlesByMedian].sort((a, b) => a.title.localeCompare(b.title));
+    } else {
+      displayJobTitles = [...jobTitlesByMedian].sort((a, b) => b.median - a.median);
+    }
 
     // Check if we have any valid job titles
     if (jobTitlesByMedian.length === 0) {
@@ -124,8 +145,8 @@ export default function SalaryJobTitleRidgeline({ data, isLoading }: SalaryJobTi
 
     // Select job titles to display (top 10 if showTopTitles is true, or max 20 for "All")
     const displayedTitles = showTopTitles
-      ? jobTitlesByMedian.slice(0, Math.min(10, jobTitlesByMedian.length)) // Top 10 highest paying positions
-      : jobTitlesByMedian.slice(0, Math.min(20, jobTitlesByMedian.length)); // Cap at 20 titles for readability
+      ? displayJobTitles.slice(0, Math.min(10, displayJobTitles.length)) // Top 10 highest paying positions
+      : displayJobTitles.slice(0, Math.min(20, displayJobTitles.length)); // Cap at 20 titles for readability
 
     // Find global min and max for x scale with safety checks
     let globalMin = d3.min(displayedTitles, d => d.min) || 0;
@@ -447,45 +468,147 @@ export default function SalaryJobTitleRidgeline({ data, isLoading }: SalaryJobTi
 
   return (
     <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-lg shadow overflow-hidden border border-gray-700 h-full flex flex-col">
-      <div className="p-2 border-b border-gray-700 flex items-center justify-between">
-        <h3 className="text-sm font-semibold bg-gradient-to-r from-cyan-400 to-blue-500 text-transparent bg-clip-text">
-          Salary by Job Title
-        </h3>
-        <div className="flex items-center space-x-1 rounded overflow-hidden border border-blue-800/60">
-          <Button
-            size="sm"
-            variant={showTopTitles ? "ghost" : "secondary"}
-            className={`h-6 px-2 py-0 text-xs rounded-none ${
-              !showTopTitles 
-                ? 'bg-blue-900/70 text-blue-100 hover:bg-blue-900/90' 
-                : 'text-gray-400 hover:bg-gray-800'
-            }`}
-            onClick={() => {
-              if (showTopTitles) {
-                setShowTopTitles(false);
+      <div className="p-2 border-b border-gray-700">
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="text-sm font-semibold bg-gradient-to-r from-cyan-400 to-blue-500 text-transparent bg-clip-text">
+            Salary by Job Title
+          </h3>
+          <div className="flex items-center space-x-1 rounded overflow-hidden border border-blue-800/60">
+            <Button
+              size="sm"
+              variant={showTopTitles ? "ghost" : "secondary"}
+              className={`h-6 px-2 py-0 text-xs rounded-none ${
+                !showTopTitles 
+                  ? 'bg-blue-900/70 text-blue-100 hover:bg-blue-900/90' 
+                  : 'text-gray-400 hover:bg-gray-800'
+              }`}
+              onClick={() => {
+                if (showTopTitles) {
+                  setShowTopTitles(false);
+                  setRedrawTrigger(prev => prev + 1);
+                }
+              }}
+            >
+              All
+            </Button>
+            <Button
+              size="sm"
+              variant={!showTopTitles ? "ghost" : "secondary"}
+              className={`h-6 px-2 py-0 text-xs rounded-none ${
+                showTopTitles 
+                  ? 'bg-blue-900/70 text-blue-100 hover:bg-blue-900/90' 
+                  : 'text-gray-400 hover:bg-gray-800'
+              }`}
+              onClick={() => {
+                if (!showTopTitles) {
+                  setShowTopTitles(true);
+                  setRedrawTrigger(prev => prev + 1);
+                }
+              }}
+            >
+              Top 10
+            </Button>
+          </div>
+        </div>
+        
+        <div className="flex flex-wrap gap-1 justify-between">
+          {/* Visualization Style Controls */}
+          <div className="flex items-center space-x-1 rounded overflow-hidden border border-purple-800/60">
+            <Button
+              size="sm"
+              variant={visualizationStyle === 'boxplot' ? "secondary" : "ghost"}
+              className={`h-6 px-2 py-0 text-xs rounded-none ${
+                visualizationStyle === 'boxplot' 
+                  ? 'bg-purple-900/70 text-purple-100 hover:bg-purple-900/90' 
+                  : 'text-gray-400 hover:bg-gray-800'
+              }`}
+              onClick={() => {
+                setVisualizationStyle('boxplot');
                 setRedrawTrigger(prev => prev + 1);
-              }
-            }}
-          >
-            All
-          </Button>
-          <Button
-            size="sm"
-            variant={!showTopTitles ? "ghost" : "secondary"}
-            className={`h-6 px-2 py-0 text-xs rounded-none ${
-              showTopTitles 
-                ? 'bg-blue-900/70 text-blue-100 hover:bg-blue-900/90' 
-                : 'text-gray-400 hover:bg-gray-800'
-            }`}
-            onClick={() => {
-              if (!showTopTitles) {
-                setShowTopTitles(true);
+              }}
+            >
+              Box Plot
+            </Button>
+            <Button
+              size="sm"
+              variant={visualizationStyle === 'density' ? "secondary" : "ghost"}
+              className={`h-6 px-2 py-0 text-xs rounded-none ${
+                visualizationStyle === 'density' 
+                  ? 'bg-purple-900/70 text-purple-100 hover:bg-purple-900/90' 
+                  : 'text-gray-400 hover:bg-gray-800'
+              }`}
+              onClick={() => {
+                setVisualizationStyle('density');
                 setRedrawTrigger(prev => prev + 1);
-              }
-            }}
-          >
-            Top 10
-          </Button>
+              }}
+            >
+              Density
+            </Button>
+            <Button
+              size="sm"
+              variant={visualizationStyle === 'bars' ? "secondary" : "ghost"}
+              className={`h-6 px-2 py-0 text-xs rounded-none ${
+                visualizationStyle === 'bars' 
+                  ? 'bg-purple-900/70 text-purple-100 hover:bg-purple-900/90' 
+                  : 'text-gray-400 hover:bg-gray-800'
+              }`}
+              onClick={() => {
+                setVisualizationStyle('bars');
+                setRedrawTrigger(prev => prev + 1);
+              }}
+            >
+              Bar Chart
+            </Button>
+          </div>
+          
+          {/* Sorting Controls */}
+          <div className="flex items-center space-x-1 rounded overflow-hidden border border-cyan-800/60">
+            <Button
+              size="sm"
+              variant={sortBy === 'median' ? "secondary" : "ghost"}
+              className={`h-6 px-2 py-0 text-xs rounded-none ${
+                sortBy === 'median' 
+                  ? 'bg-cyan-900/70 text-cyan-100 hover:bg-cyan-900/90' 
+                  : 'text-gray-400 hover:bg-gray-800'
+              }`}
+              onClick={() => {
+                setSortBy('median');
+                setRedrawTrigger(prev => prev + 1);
+              }}
+            >
+              By Median
+            </Button>
+            <Button
+              size="sm"
+              variant={sortBy === 'range' ? "secondary" : "ghost"}
+              className={`h-6 px-2 py-0 text-xs rounded-none ${
+                sortBy === 'range' 
+                  ? 'bg-cyan-900/70 text-cyan-100 hover:bg-cyan-900/90' 
+                  : 'text-gray-400 hover:bg-gray-800'
+              }`}
+              onClick={() => {
+                setSortBy('range');
+                setRedrawTrigger(prev => prev + 1);
+              }}
+            >
+              By Range
+            </Button>
+            <Button
+              size="sm"
+              variant={sortBy === 'alphabetical' ? "secondary" : "ghost"}
+              className={`h-6 px-2 py-0 text-xs rounded-none ${
+                sortBy === 'alphabetical' 
+                  ? 'bg-cyan-900/70 text-cyan-100 hover:bg-cyan-900/90' 
+                  : 'text-gray-400 hover:bg-gray-800'
+              }`}
+              onClick={() => {
+                setSortBy('alphabetical');
+                setRedrawTrigger(prev => prev + 1);
+              }}
+            >
+              A-Z
+            </Button>
+          </div>
         </div>
       </div>
       <div className="p-2 flex-grow flex flex-col">
